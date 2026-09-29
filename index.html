@@ -116,6 +116,7 @@ table.st td:first-child{color:var(--mut);text-align:left}
 <script type="module">
 import * as THREE from 'three';
 import { RoomEnvironment } from './lib/RoomEnvironment.js';
+import { FBXLoader } from './lib/jsm/loaders/FBXLoader.js';
 
 // ================= 基本設定 =================
 const $ = id => document.getElementById(id);
@@ -909,6 +910,121 @@ function makeRig(col, num) {
 }
 const rigs = [makeRig(COLS[0], 7), makeRig(COLS[1], 11)];
 
+// ================= 寫實球員模型(Microsoft Rocketbox,MIT)=================
+// 程序骨架(上面的 makeRig)在背後照常擺姿勢，再把關節方向重定向到真人模型的骨頭上。
+const MODEL_H = 6.6, MODEL_SRC_H = 180.7, MS = MODEL_H / MODEL_SRC_H;
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3();
+const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
+const hexRGB = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+const isSkin = (r, g, b) => r > 80 && r > g && g > b && r - b > 35 && (r - g) < 90;
+
+function teamTexture(img, team, part) {
+  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+  const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+  const d = g.getImageData(0, 0, c.width, c.height), px = d.data, w = c.width, S = w / 1024;
+  const jer = hexRGB(COLS[team].jer), sh = hexRGB(COLS[team].shorts);
+  for (let i = 0; i < px.length; i += 4) {
+    const r = px[i], gg = px[i + 1], b = px[i + 2], mx = Math.max(r, gg, b), mn = Math.min(r, gg, b);
+    const x = (i >> 2) % w, y = Math.floor((i >> 2) / w), sat = mx ? (mx - mn) / mx : 0;
+    if (part === 'body' && team === 1 && b > r * 1.35 && b > gg * 1.05 && sat > .3) {
+      const k = Math.min(1.25, mx / 190);
+      px[i] = Math.min(255, jer[0] * k); px[i + 1] = Math.min(255, jer[1] * k); px[i + 2] = Math.min(255, jer[2] * k);
+    } else if (part === 'body' && team === 1 && y < 200 * S && (x < 310 * S || x > 715 * S) && sat < .2 && mx > 110) {
+      const k = mx / 235; px[i] = sh[0] * k; px[i + 1] = sh[1] * k; px[i + 2] = sh[2] * k;
+    } else if (team === 1 && isSkin(r, gg, b)) {
+      px[i] = r * .6; px[i + 1] = gg * .5; px[i + 2] = b * .45;
+    }
+  }
+  g.putImageData(d, 0, 0);
+  if (part === 'body') {
+    // 球衣號碼：中間那塊是軀幹展開，上半面/下半面各印一次
+    g.font = `900 ${200 * S}px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineWidth = 12 * S; g.strokeStyle = COLS[team].trim; g.fillStyle = '#ffffff';
+    const num = String(team === 0 ? 7 : 11);
+    for (const [cx, cy, rot] of [[512, 175, Math.PI], [512, 715, 0]]) {
+      g.save(); g.translate(cx * S, cy * S); g.rotate(rot); g.strokeText(num, 0, 0); g.fillText(num, 0, 0); g.restore();
+    }
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = MAX_ANISO; t.flipY = true;
+  return t;
+}
+
+async function loadPlayers() {
+  const il = new THREE.ImageLoader();
+  const [buf, bodyC, headC, bodyN, headN] = await Promise.all([
+    fetch('./assets/player.fbx').then(r => { if (!r.ok) throw new Error('fbx ' + r.status); return r.arrayBuffer(); }),
+    il.loadAsync('./assets/m026_body_color.jpg'), il.loadAsync('./assets/m026_head_color.jpg'),
+    new THREE.TextureLoader().loadAsync('./assets/m026_body_normal.jpg'), new THREE.TextureLoader().loadAsync('./assets/m026_head_normal.jpg'),
+  ]);
+  const fbx = new FBXLoader();
+  for (const team of [0, 1]) {
+    const obj = fbx.parse(buf, '');
+    const mats = {
+      m026_body: new THREE.MeshStandardMaterial({ map: teamTexture(bodyC, team, 'body'), normalMap: bodyN, roughness: .72, metalness: 0 }),
+      m026_head: new THREE.MeshStandardMaterial({ map: teamTexture(headC, team, 'head'), normalMap: headN, roughness: .6, metalness: 0 }),
+    };
+    const bones = {};
+    obj.traverse(o => {
+      if (o.isMesh) {
+        o.material = (Array.isArray(o.material) ? o.material : [o.material]).map(m => mats[m.name] || mats.m026_body);
+        o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false;
+      }
+      if (o.isBone) bones[o.name.replace('Bip01_', '')] = o;
+    });
+    const box = new THREE.Group(); box.add(obj); obj.scale.setScalar(MS); scene.add(box);
+    obj.updateMatrixWorld(true);
+    const rest = {}; for (const k in bones) rest[k] = bones[k].quaternion.clone();
+    const rootY = bones.Pelvis.parent.position.y;
+    const len = (a, b) => bones[a].getWorldPosition(_a).distanceTo(bones[b].getWorldPosition(_b));
+    const footDir = {};
+    for (const k of ['L', 'R']) footDir[k] = bones[k + '_Toe0'].getWorldPosition(_a).sub(bones[k + '_Foot'].getWorldPosition(_b)).normalize().clone();
+    const R = rigs[team];
+    R.model = { box, obj, bones, rest, root: bones.Pelvis.parent, rootY, footDir,
+      thigh: len('L_Thigh', 'L_Calf'), calf: len('L_Calf', 'L_Foot') };
+    R.root.visible = false;
+  }
+}
+
+function aimBone(bone, tip, dir) {
+  bone.getWorldPosition(_a); tip.getWorldPosition(_b);
+  _q1.setFromUnitVectors(_b.sub(_a).normalize(), dir);
+  bone.getWorldQuaternion(_q2); _q1.multiply(_q2);
+  bone.parent.getWorldQuaternion(_q3).invert();
+  bone.quaternion.copy(_q3.multiply(_q1));
+  bone.updateMatrixWorld(true);
+}
+const jp = (obj, x = 0, y = 0, z = 0) => obj.localToWorld(new THREE.Vector3(x, y, z));
+
+function driveModel(R, T, p) {
+  const M = R.model, B = M.bones;
+  for (const k in M.rest) B[k].quaternion.copy(M.rest[k]);
+  M.box.position.set(p.x, p.z, p.y); M.box.rotation.y = p.face;
+  M.root.position.y = M.rootY + T.hy / MS;
+  M.box.updateMatrixWorld(true);
+  R.root.updateMatrixWorld(true);
+  const hips = jp(R.hips), neck = jp(R.torso, 0, 2.05, 0), head = jp(R.head, 0, .38, 0);
+  aimBone(B.Spine, B.Neck, neck.clone().sub(hips).normalize());
+  aimBone(B.Neck, B.Head, head.sub(neck).normalize());
+  for (const k of ['L', 'R']) {
+    const a = R.arm[k], sh = jp(a.sh), el = jp(a.el), wr = jp(a.el, 0, -.98, 0);
+    aimBone(B[k + '_UpperArm'], B[k + '_Forearm'], el.clone().sub(sh).normalize());
+    aimBone(B[k + '_Forearm'], B[k + '_Hand'], wr.sub(el).normalize());
+    // 腿：兩段式 IK,腳踝跟著程序骨架、膝蓋朝程序骨架膝蓋方向
+    const l = R.leg[k], H = B[k + '_Thigh'].getWorldPosition(new THREE.Vector3());
+    const A = jp(l.an); A.y = Math.max(A.y, .33);
+    const pole = jp(l.kn);
+    const ha = A.clone().sub(H), dist = clamp(ha.length(), .2, M.thigh + M.calf - .01); ha.normalize();
+    const cosT = clamp((M.thigh * M.thigh + dist * dist - M.calf * M.calf) / (2 * M.thigh * dist), -1, 1), sinT = Math.sqrt(1 - cosT * cosT);
+    const po = pole.sub(H); po.sub(_c.copy(ha).multiplyScalar(po.dot(ha)));
+    if (po.lengthSq() < 1e-6) po.set(Math.sin(p.face), 0, Math.cos(p.face)); po.normalize();
+    const K = H.clone().addScaledVector(ha, M.thigh * cosT).addScaledVector(po, M.thigh * sinT);
+    const Af = H.clone().addScaledVector(ha, dist);
+    aimBone(B[k + '_Thigh'], B[k + '_Calf'], K.clone().sub(H).normalize());
+    aimBone(B[k + '_Calf'], B[k + '_Foot'], Af.sub(K).normalize());
+    aimBone(B[k + '_Foot'], B[k + '_Toe0'], _d.copy(M.footDir[k]).applyQuaternion(l.an.getWorldQuaternion(_q1)).normalize());
+  }
+}
+
 function targetPose(p) {
   const o = other(p), sp = hyp(p.vx, p.vy), onG = p.z < .02;
   const f = fwdOf(p), r = rightOf(p);
@@ -971,6 +1087,7 @@ function poseRig(p, dt) {
     const a = R.arm[k], t = T[k]; a.sh.rotation.set(t.x, 0, a.s * t.z); a.el.rotation.x = t.e;
     const l = R.leg[k], u = T['l' + k]; l.hp.rotation.set(u.x, 0, l.s * u.z); l.kn.rotation.x = u.k; l.an.rotation.x = -(u.x + u.k) * .6;
   }
+  if (R.model) driveModel(R, T, p);
   R.ring.position.set(p.x, .03, p.y);
   R.ring.material.opacity = p.isAI ? .45 : .9;
 }
@@ -984,6 +1101,7 @@ function updCamera(dt) {
     const bx = clamp(ball.x, -25, 25), by = clamp(ball.y, 0, 44);
     tp.set(bx * .5, 19 + by * .06, 50 + by * .2); tl.set(bx * .55, 6, 3 + by * .55);
   }
+  if (G.camOverride) { const c = G.camOverride(); tp.copy(c[0]); tl.copy(c[1]); }
   camPos.lerp(tp, Math.min(1, dt * 2.2)); camLook.lerp(tl, Math.min(1, dt * 3));
   camera.position.copy(camPos);
   if (G.rimShake > .25) camera.position.add(new THREE.Vector3(rnd(-1, 1), rnd(-1, 1), 0).multiplyScalar(G.rimShake * .35));
@@ -1166,7 +1284,7 @@ function toMenu() { G.state = 'menu'; setupDemo(); show('over', false); show('pa
   seg('segDiff', Object.entries(DIFFS).map(([k, d]) => [k, d.nm]), () => G.diffKey, v => G.diffKey = v);
   seg('segTarget', [[11, '11 分'], [15, '15 分'], [21, '21 分']], () => G.target, v => G.target = v);
   if (IS_TOUCH) $('helpKeys').innerHTML = '左下搖桿移動 · 「投籃」按住起跳、<b>最高點放開</b>出手(綠區=完美)<br>「花式/抄截」進攻晃人、防守抄截 · 防守時按「投籃」跳起封阻 · 按住「衝刺」加速';
-  $('btnStart').onclick = startGame; $('btnStart').disabled = false; $('btnStart').textContent = '開始比賽';
+  $('btnStart').onclick = startGame; $('btnStart').textContent = '載入球員模型…';
   $('btnAgain').onclick = startGame;
   $('btnMenu').onclick = toMenu;
   $('btnQuit').onclick = toMenu;
@@ -1176,6 +1294,8 @@ function toMenu() { G.state = 'menu'; setupDemo(); show('over', false); show('pa
 })();
 
 setupDemo();
+loadPlayers().catch(e => console.warn('寫實模型載入失敗，改用簡易模型', e))
+  .finally(() => { $('btnStart').disabled = false; $('btnStart').textContent = '開始比賽'; });
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(.033, (now - last) / 1000); last = now;
@@ -1186,7 +1306,7 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // 測試用掛勾
-window.__T = { G, ball, update, aiUpdate, user, cpu, startGame, inp, setReadMove: f => { readMove = f; } };
+window.__T = { THREE, G, ball, sync3D, update, aiUpdate, user, cpu, startGame, inp, setReadMove: f => { readMove = f; } };
 </script>
 </body>
 </html>

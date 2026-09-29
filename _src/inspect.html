@@ -1,0 +1,16 @@
+<!doctype html><html><body><script type="importmap">{"imports":{"three":"../lib/three.module.min.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { FBXLoader } from '../lib/jsm/loaders/FBXLoader.js';
+const buf = await (await fetch('../assets/player.fbx')).arrayBuffer();
+const obj = new FBXLoader().parse(buf, '');
+obj.updateMatrixWorld(true);
+const box = new THREE.Box3().setFromObject(obj);
+const out = { box: [box.min.toArray().map(v=>+v.toFixed(1)), box.max.toArray().map(v=>+v.toFixed(1))], meshes: [], bones: [] };
+obj.traverse(o => {
+  if (o.isSkinnedMesh || o.isMesh) out.meshes.push([o.name, o.type, (Array.isArray(o.material)?o.material:[o.material]).map(m=>m.name), o.geometry.attributes.position.count]);
+  if (o.isBone) { const p=o.getWorldPosition(new THREE.Vector3()); out.bones.push([o.name, o.parent && o.parent.name, p.toArray().map(v=>+v.toFixed(1))]); }
+});
+out.rootRot = obj.rotation.toArray(); out.rootScale = obj.scale.toArray();
+window.RES = out;
+</script></body></html>

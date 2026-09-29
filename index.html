@@ -118,6 +118,13 @@ import * as THREE from 'three';
 import { RoomEnvironment } from './lib/RoomEnvironment.js';
 import { GLTFLoader } from './lib/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from './lib/jsm/libs/meshopt_decoder.module.js';
+import { EffectComposer } from './lib/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from './lib/jsm/postprocessing/RenderPass.js';
+import { GTAOPass } from './lib/jsm/postprocessing/GTAOPass.js';
+import { UnrealBloomPass } from './lib/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from './lib/jsm/postprocessing/OutputPass.js';
+import { ShaderPass } from './lib/jsm/postprocessing/ShaderPass.js';
+import { SMAAPass } from './lib/jsm/postprocessing/SMAAPass.js';
 
 // ================= 基本設定 =================
 const $ = id => document.getElementById(id);
@@ -700,14 +707,18 @@ function canvasTex(w, h, draw) {
 }
 
 // 燈光
-scene.add(new THREE.HemisphereLight('#c8d4ff', '#3a2414', .45));
-const sun = new THREE.DirectionalLight('#fff3e2', 2.4);
+scene.add(new THREE.HemisphereLight('#c8d4ff', '#3a2414', .3));
+const sun = new THREE.DirectionalLight('#fff3e2', 1.9);
 sun.position.set(14, 70, 44); sun.target.position.set(0, 0, 20);
 sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -38, right: 38, top: 42, bottom: -42, near: 20, far: 160 });
 sun.shadow.bias = -.0004; sun.shadow.normalBias = .03;
 scene.add(sun, sun.target);
 const fill = new THREE.DirectionalLight('#9fb6ff', .5); fill.position.set(-30, 30, 70); scene.add(fill);
+for (const [x, z] of [[-14, 8], [14, 8], [-14, 30], [14, 30], [0, 18]]) {
+  const sp = new THREE.SpotLight('#fff1dc', 520, 140, .42, .65, 1.6);
+  sp.position.set(x * .8, 52, z); sp.target.position.set(x, 0, z); scene.add(sp, sp.target);
+}
 
 // 球場地板(Canvas 繪製木紋與標線)
 const courtTex = canvasTex(2000, 1880, (g, cw, ch) => {
@@ -742,10 +753,30 @@ const courtTex = canvasTex(2000, 1880, (g, cw, ch) => {
   const a0 = Math.asin(8.95 / 23.75);
   g.beginPath(); g.moveTo(X(-22), Y(0)); g.lineTo(X(-22), Y(14.2)); g.arc(X(0), Y(5.25), 23.75 * S, Math.PI - a0, a0, true); g.lineTo(X(22), Y(0)); g.stroke();
 });
-const court = mesh(new THREE.PlaneGeometry(50, 47), std('#ffffff', .3, { map: courtTex, envMapIntensity: .55 }), scene, 0, 0, 23.5, false);
+const LIGHTMAP_INT = .45;
+const court = mesh(new THREE.PlaneGeometry(50, 47, 1, 1), std('#ffffff', .3, { map: courtTex, envMapIntensity: .55 }), scene, 0, 0, 23.5, false);
 court.rotation.x = -Math.PI / 2; court.receiveShadow = true;
 const apron = mesh(new THREE.PlaneGeometry(160, 130), std('#14213d', .45, { envMapIntensity: .4 }), scene, 0, -.02, 20, false);
 apron.rotation.x = -Math.PI / 2; apron.receiveShadow = true;
+// Blender Cycles 烘焙的地板光照(tools/bake_arena.py):依世界座標產生第二組 UV
+(async function applyFloorLightmap() {
+  try {
+    const meta = await (await fetch('./assets/floor_light.json')).json();
+    const tex = await new THREE.TextureLoader().loadAsync('./assets/floor_light.jpg');
+    tex.colorSpace = THREE.SRGBColorSpace; tex.channel = 1; tex.anisotropy = MAX_ANISO;
+    const { x0, x1, z0, z1 } = meta.region;
+    for (const m of [court, apron]) {
+      m.updateMatrixWorld(true);
+      const pos = m.geometry.attributes.position, uv = new Float32Array(pos.count * 2), v = new THREE.Vector3();
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+        uv[i * 2] = (v.x - x0) / (x1 - x0); uv[i * 2 + 1] = (z1 - v.z) / (z1 - z0);
+      }
+      m.geometry.setAttribute('uv1', new THREE.BufferAttribute(uv, 2));
+      m.material.lightMap = tex; m.material.lightMapIntensity = LIGHTMAP_INT; m.material.needsUpdate = true;
+    }
+  } catch (e) { console.warn('lightmap 載入失敗', e); }
+})();
 
 // 看台與觀眾(InstancedMesh)
 const crowdData = [];
@@ -1338,12 +1369,39 @@ function drawMsgs() {
 
 function render(dt) {
   sync3D(dt);
-  renderer.render(scene, camera);
+  composer.render(dt);
   ctx.clearRect(0, 0, W, H);
   if (G.state !== 'menu') { drawPlayerMarks(); drawHUD(); drawMsgs(); }
 }
 
-function fit() { const s = $('stage'); renderer.setSize(s.clientWidth, s.clientHeight, false); }
+const HQ = !IS_TOUCH;
+const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: HQ ? 4 : 0 }));
+composer.addPass(new RenderPass(scene, camera));
+let gtao = null;
+if (HQ) {
+  gtao = new GTAOPass(scene, camera, 4, 4);
+  gtao.updateGtaoMaterial({ radius: 2.2, distanceExponent: 1.4, thickness: 3, scale: 1, samples: 16 });
+  gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
+  gtao.blendIntensity = .85;
+  composer.addPass(gtao);
+}
+const bloom = new UnrealBloomPass(new THREE.Vector2(4, 4), .22, .5, .96);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+composer.addPass(new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, vig: { value: .32 }, sat: { value: 1.05 }, con: { value: 1.07 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float vig, sat, con; varying vec2 vUv;
+    void main(){ vec4 c = texture2D(tDiffuse, vUv); float l = dot(c.rgb, vec3(.2126,.7152,.0722));
+      c.rgb = mix(vec3(l), c.rgb, sat); c.rgb = (c.rgb - .5) * con + .5;
+      vec2 d = vUv - .5; c.rgb *= 1. - vig * dot(d, d) * 1.6; gl_FragColor = c; }`,
+}));
+let smaa = null;
+if (!HQ) { smaa = new SMAAPass(4, 4); composer.addPass(smaa); }
+function fit() {
+  const s = $('stage'), w = s.clientWidth, h = s.clientHeight;
+  renderer.setSize(w, h, false); composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h);
+}
 addEventListener('resize', fit); fit();
 
 // ================= 流程 / 選單 =================
@@ -1419,8 +1477,21 @@ setupDemo();
 loadPlayers().catch(e => console.warn('寫實模型載入失敗，改用簡易模型', e))
   .finally(() => { $('btnStart').disabled = false; $('btnStart').textContent = '開始比賽'; });
 let last = performance.now();
+// 自動降畫質：連續 2 秒平均低於 40fps → 先關 GTAO,再把解析度倍率降到 1
+const perf = { t: 0, n: 0, step: 0 };
+function autoQuality(rawDt) {
+  if (perf.step >= 2 || document.hidden) return;
+  perf.t += rawDt; perf.n++;
+  if (perf.t < 2) return;
+  const fps = perf.n / perf.t; perf.t = 0; perf.n = 0;
+  if (fps >= 40) return;
+  if (perf.step === 0 && gtao) { gtao.enabled = false; perf.step = 1; console.info('畫質自動調降：關閉 GTAO', fps.toFixed(0)); }
+  else { renderer.setPixelRatio(1); fit(); perf.step = 2; console.info('畫質自動調降：解析度倍率 1', fps.toFixed(0)); }
+}
 function frame(now) {
-  const dt = Math.min(.033, (now - last) / 1000); last = now;
+  const rawDt = (now - last) / 1000;
+  const dt = Math.min(.033, rawDt); last = now;
+  autoQuality(Math.min(rawDt, .5));
   update(dt);
   render(dt);
   requestAnimationFrame(frame);

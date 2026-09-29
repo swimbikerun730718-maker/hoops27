@@ -26,4 +26,6 @@
 - 球員人物與動畫：[Adobe Mixamo](https://www.mixamo.com)(Bryce、David 與 19 段動作),依 Mixamo 條款可免權利金用於本遊戲;**請勿把 `assets/*.glb` 抽出當獨立素材再散布**
 - 跳投與防守滑步：[CMU Graphics Lab Motion Capture Database](http://mocap.cs.cmu.edu/)(06_15 跳投、102_28 防守滑步;BVH 轉檔版 by Bruce Hahne),依 CMU 條款可自由使用。`tools/cmu_to_json.py` 轉成關節軌跡，遊戲載入時重定向到 Mixamo 骨架
 - 轉檔流程：Blender 5(`tools/build_glb.py` 合併人物與動作)→ glTF-Transform(meshopt + WebP 壓縮)
+- 場館光照：Blender Cycles 在 qqs34 烘焙地板光照貼圖(`tools/bake_arena.py`)
+- 畫面後製：GTAO 環境光遮蔽(桌機)、Bloom、調色暗角、MSAA/SMAA 抗鋸齒;幀率不足時自動降畫質
 - 3D 引擎：[three.js](https://threejs.org/) r160(MIT)

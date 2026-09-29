@@ -20,8 +20,9 @@
 | 花式運球 / 抄截 | E | 花式/抄截鈕 |
 | 暫停 | P / Esc | ⏸ |
 
-`index.html` + 內附 Three.js r160(`lib/`)：寫實球員模型(程序動畫即時重定向到骨架)、程式建模的籃架、籃網與觀眾，即時陰影，音效用 WebAudio 合成，不依賴外部 CDN。原創作品，與任何職業聯盟或遊戲公司無關。
+`index.html` + 內附 Three.js r160(`lib/`)。球員是 Adobe Mixamo 人物，搭配真人動作捕捉動畫(跑步、運球、防守滑步、跳投、灌籃掛框、火鍋、晃倒、慶祝…),持球與投籃時的手臂由程式即時疊加;場館、籃架、籃網、觀眾為程式建模，即時陰影，音效用 WebAudio 合成。原創作品，與任何職業聯盟或遊戲公司無關。
 
 ## 素材授權
-- 球員模型與貼圖：[Microsoft Rocketbox](https://github.com/microsoft/Microsoft-Rocketbox) `Sports_Male_04`(MIT License,見 `assets/ROCKETBOX_LICENSE.txt`),貼圖縮為 1024,執行時依隊伍重新上色
+- 球員人物與動畫：[Adobe Mixamo](https://www.mixamo.com)(Bryce、David 與 19 段動作),依 Mixamo 條款可免權利金用於本遊戲;**請勿把 `assets/*.glb` 抽出當獨立素材再散布**
+- 轉檔流程：Blender 5(`tools/build_glb.py` 合併人物與動作)→ glTF-Transform(meshopt + WebP 壓縮)
 - 3D 引擎：[three.js](https://threejs.org/) r160(MIT)

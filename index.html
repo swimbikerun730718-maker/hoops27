@@ -116,7 +116,8 @@ table.st td:first-child{color:var(--mut);text-align:left}
 <script type="module">
 import * as THREE from 'three';
 import { RoomEnvironment } from './lib/RoomEnvironment.js';
-import { FBXLoader } from './lib/jsm/loaders/FBXLoader.js';
+import { GLTFLoader } from './lib/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from './lib/jsm/libs/meshopt_decoder.module.js';
 
 // ================= 基本設定 =================
 const $ = id => document.getElementById(id);
@@ -224,7 +225,7 @@ function pop(p, text, color) { p.pop = { text, color, t: 0 }; }
 // ================= 動作 =================
 function jump(p) {
   if (p.z > .01 || p.shot || p.stun > 0 || p.dunkHang > 0) return;
-  p.vz = 12.5 + 2.5 * p.r.blk;
+  p.vz = p.vz0 = 12.5 + 2.5 * p.r.blk;
 }
 
 function startShot(p) {
@@ -240,6 +241,7 @@ function startShot(p) {
     const tx = HOOP.x + (p.x - HOOP.x) * k, ty = Math.max(HOOP.y + .7, HOOP.y + (p.y - HOOP.y) * k);
     p.vx = (tx - p.x) / .42; p.vy = (ty - p.y) / .42; p.vz = type === 'dunk' ? 17 : 13;
   }
+  p.vz0 = p.vz;
   if (p.isAI) p.ai.releaseAt = clamp(.9 + gauss() * G.diff.sd, .55, 1.2);
   const o = other(p);
   if (o.isAI) o.ai.contestT = G.diff.react * rnd(.8, 1.25);
@@ -910,80 +912,13 @@ function makeRig(col, num) {
 }
 const rigs = [makeRig(COLS[0], 7), makeRig(COLS[1], 11)];
 
-// ================= 寫實球員模型(Microsoft Rocketbox,MIT)=================
-// 程序骨架(上面的 makeRig)在背後照常擺姿勢，再把關節方向重定向到真人模型的骨頭上。
-const MODEL_H = 6.6, MODEL_SRC_H = 180.7, MS = MODEL_H / MODEL_SRC_H;
-const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3();
-const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
-const hexRGB = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
-const isSkin = (r, g, b) => r > 80 && r > g && g > b && r - b > 35 && (r - g) < 90;
-
-function teamTexture(img, team, part) {
-  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
-  const g = c.getContext('2d'); g.drawImage(img, 0, 0);
-  const d = g.getImageData(0, 0, c.width, c.height), px = d.data, w = c.width, S = w / 1024;
-  const jer = hexRGB(COLS[team].jer), sh = hexRGB(COLS[team].shorts);
-  for (let i = 0; i < px.length; i += 4) {
-    const r = px[i], gg = px[i + 1], b = px[i + 2], mx = Math.max(r, gg, b), mn = Math.min(r, gg, b);
-    const x = (i >> 2) % w, y = Math.floor((i >> 2) / w), sat = mx ? (mx - mn) / mx : 0;
-    if (part === 'body' && team === 1 && b > r * 1.35 && b > gg * 1.05 && sat > .3) {
-      const k = Math.min(1.25, mx / 190);
-      px[i] = Math.min(255, jer[0] * k); px[i + 1] = Math.min(255, jer[1] * k); px[i + 2] = Math.min(255, jer[2] * k);
-    } else if (part === 'body' && team === 1 && y < 200 * S && (x < 310 * S || x > 715 * S) && sat < .2 && mx > 110) {
-      const k = mx / 235; px[i] = sh[0] * k; px[i + 1] = sh[1] * k; px[i + 2] = sh[2] * k;
-    } else if (team === 1 && isSkin(r, gg, b)) {
-      px[i] = r * .6; px[i + 1] = gg * .5; px[i + 2] = b * .45;
-    }
-  }
-  g.putImageData(d, 0, 0);
-  if (part === 'body') {
-    // 球衣號碼：中間那塊是軀幹展開，上半面/下半面各印一次
-    g.font = `900 ${200 * S}px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.lineWidth = 12 * S; g.strokeStyle = COLS[team].trim; g.fillStyle = '#ffffff';
-    const num = String(team === 0 ? 7 : 11);
-    for (const [cx, cy, rot] of [[512, 175, Math.PI], [512, 715, 0]]) {
-      g.save(); g.translate(cx * S, cy * S); g.rotate(rot); g.strokeText(num, 0, 0); g.fillText(num, 0, 0); g.restore();
-    }
-  }
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = MAX_ANISO; t.flipY = true;
-  return t;
-}
-
-async function loadPlayers() {
-  const il = new THREE.ImageLoader();
-  const [buf, bodyC, headC, bodyN, headN] = await Promise.all([
-    fetch('./assets/player.fbx').then(r => { if (!r.ok) throw new Error('fbx ' + r.status); return r.arrayBuffer(); }),
-    il.loadAsync('./assets/m026_body_color.jpg'), il.loadAsync('./assets/m026_head_color.jpg'),
-    new THREE.TextureLoader().loadAsync('./assets/m026_body_normal.jpg'), new THREE.TextureLoader().loadAsync('./assets/m026_head_normal.jpg'),
-  ]);
-  const fbx = new FBXLoader();
-  for (const team of [0, 1]) {
-    const obj = fbx.parse(buf, '');
-    const mats = {
-      m026_body: new THREE.MeshStandardMaterial({ map: teamTexture(bodyC, team, 'body'), normalMap: bodyN, roughness: .72, metalness: 0 }),
-      m026_head: new THREE.MeshStandardMaterial({ map: teamTexture(headC, team, 'head'), normalMap: headN, roughness: .6, metalness: 0 }),
-    };
-    const bones = {};
-    obj.traverse(o => {
-      if (o.isMesh) {
-        o.material = (Array.isArray(o.material) ? o.material : [o.material]).map(m => mats[m.name] || mats.m026_body);
-        o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false;
-      }
-      if (o.isBone) bones[o.name.replace('Bip01_', '')] = o;
-    });
-    const box = new THREE.Group(); box.add(obj); obj.scale.setScalar(MS); scene.add(box);
-    obj.updateMatrixWorld(true);
-    const rest = {}; for (const k in bones) rest[k] = bones[k].quaternion.clone();
-    const rootY = bones.Pelvis.parent.position.y;
-    const len = (a, b) => bones[a].getWorldPosition(_a).distanceTo(bones[b].getWorldPosition(_b));
-    const footDir = {};
-    for (const k of ['L', 'R']) footDir[k] = bones[k + '_Toe0'].getWorldPosition(_a).sub(bones[k + '_Foot'].getWorldPosition(_b)).normalize().clone();
-    const R = rigs[team];
-    R.model = { box, obj, bones, rest, root: bones.Pelvis.parent, rootY, footDir,
-      thigh: len('L_Thigh', 'L_Calf'), calf: len('L_Calf', 'L_Foot') };
-    R.root.visible = false;
-  }
-}
+// ================= 寫實球員(Adobe Mixamo 人物 + 真人動作捕捉)=================
+// 身體與腳步播放動作捕捉片段;持球、跳投、抄截時的手臂用程序骨架的關節方向疊加上去。
+const MODEL_H = 6.6;
+const JUMP_CLIPS = ['jump', 'block', 'dunk_jump', 'layup', 'hang'];
+const ONCE_CLIPS = ['stumble', 'celebrate'];
+const _a = new THREE.Vector3(), _b = new THREE.Vector3();
+const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion(), _q4 = new THREE.Quaternion();
 
 function aimBone(bone, tip, dir) {
   bone.getWorldPosition(_a); tip.getWorldPosition(_b);
@@ -995,33 +930,160 @@ function aimBone(bone, tip, dir) {
 }
 const jp = (obj, x = 0, y = 0, z = 0) => obj.localToWorld(new THREE.Vector3(x, y, z));
 
-function driveModel(R, T, p) {
-  const M = R.model, B = M.bones;
-  for (const k in M.rest) B[k].quaternion.copy(M.rest[k]);
+// 動作片段：改骨頭前綴;Hips 的位移/旋轉先換到場景座標(兩個人物的骨架外層節點不同)再換回目標骨架;
+// 去掉水平 root motion,跳躍片段不讓骨盆升高(高度交給遊戲物理)
+function prepClips(anims, prefix, srcParentM, dstParentM, hipsRestW) {
+  const toW = srcParentM, fromW = dstParentM.clone().invert();
+  const qToW = new THREE.Quaternion(), qFromW = new THREE.Quaternion(), tmpP = new THREE.Vector3(), tmpS = new THREE.Vector3();
+  toW.decompose(tmpP, qToW, tmpS); fromW.decompose(tmpP, qFromW, tmpS);
+  const qFix = qFromW.clone().multiply(qToW), v3 = new THREE.Vector3(), q = new THREE.Quaternion();
+  const clips = {}, info = {};
+  for (const clip of anims) {
+    const tracks = []; let hip = null;
+    for (const t of clip.tracks) {
+      const dot = t.name.lastIndexOf('.'), node = t.name.slice(0, dot), prop = t.name.slice(dot + 1);
+      const bone = node.replace(/^mixamorig\d*/, '');
+      if (prop === 'scale' || (prop === 'position' && bone !== 'Hips')) continue;
+      const nt = t.clone(); nt.name = prefix + bone + '.' + prop;
+      const v = nt.values;
+      if (bone === 'Hips' && prop === 'position') {
+        hip = { times: Array.from(nt.times), ys: [] };
+        for (let i = 0; i < v.length; i += 3) {
+          v3.set(v[i], v[i + 1], v[i + 2]).applyMatrix4(toW);
+          hip.ys.push(v3.y);
+          v3.x = hipsRestW.x; v3.z = hipsRestW.z;
+          if (JUMP_CLIPS.includes(clip.name)) v3.y = Math.min(v3.y, hipsRestW.y);
+          v3.applyMatrix4(fromW); v[i] = v3.x; v[i + 1] = v3.y; v[i + 2] = v3.z;
+        }
+      } else if (bone === 'Hips' && prop === 'quaternion') {
+        for (let i = 0; i < v.length; i += 4) {
+          q.set(v[i], v[i + 1], v[i + 2], v[i + 3]).premultiply(qFix);
+          v[i] = q.x; v[i + 1] = q.y; v[i + 2] = q.z; v[i + 3] = q.w;
+        }
+      }
+      tracks.push(nt);
+    }
+    clips[clip.name] = new THREE.AnimationClip(clip.name, clip.duration, tracks);
+    let t0 = clip.duration * .3, t1 = clip.duration * .7;
+    if (hip) {
+      const base = Math.min(...hip.ys.slice(0, 4)), up = hip.times.filter((t, i) => hip.ys[i] > base + .12);
+      if (up.length > 2) { t0 = up[0]; t1 = up[up.length - 1]; }
+    }
+    info[clip.name] = { t0, t1 };
+  }
+  return { clips, info };
+}
+
+function recolorShirt(root, hex) {
+  const [tr, tg, tb] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+  root.traverse(o => {
+    if (!o.isMesh || !/Shirt/i.test(o.name) || !o.material.map) return;
+    const src = o.material.map.image, c = document.createElement('canvas'); c.width = src.width; c.height = src.height;
+    const g = c.getContext('2d'); g.drawImage(src, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height), px = d.data;
+    for (let i = 0; i < px.length; i += 4) {
+      const r = px[i], gg = px[i + 1], b = px[i + 2];
+      if (r > 50 && r > gg * 1.4 && r > b * 1.4) { const k = Math.min(1.3, r / 170); px[i] = tr * k; px[i + 1] = tg * k; px[i + 2] = tb * k; }
+    }
+    g.putImageData(d, 0, 0);
+    const t = new THREE.CanvasTexture(c); t.flipY = false; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = MAX_ANISO;
+    o.material = o.material.clone(); o.material.map = t;
+  });
+}
+
+async function loadPlayers() {
+  const L = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+  const [gb, gd] = await Promise.all([L.loadAsync('./assets/bryce.glb'), L.loadAsync('./assets/david.glb')]);
+  const hipsParentM = g => { let h; g.scene.updateMatrixWorld(true); g.scene.traverse(o => { if (o.isBone && /Hips$/.test(o.name)) h = o; }); return h.parent.matrixWorld.clone(); };
+  const srcM = hipsParentM(gb);
+  for (const [g, team] of [[gb, 0], [gd, 1]]) {
+    const root = g.scene, bones = {}; let prefix = 'mixamorig';
+    root.traverse(o => {
+      if (o.isBone) { const m = o.name.match(/^(mixamorig\d*)(.+)$/); if (m) { prefix = m[1]; bones[m[2]] = o; } }
+      if (o.isMesh) {
+        o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false;
+        const mt = o.material;
+        if (mt.transparent && !/hair|eyelash/i.test(mt.name + o.name)) { mt.transparent = false; mt.alphaTest = .5; }
+        mt.envMapIntensity = .5; mt.metalness = 0; mt.metalnessMap = null; mt.roughnessMap = null; mt.roughness = /hair|eyelash/i.test(mt.name) ? .6 : .82;
+        if (mt.isMeshPhysicalMaterial) { mt.specularIntensity = .25; mt.specularIntensityMap = null; mt.specularColorMap = null; }
+      }
+    });
+    if (team === 0) recolorShirt(root, COLS[0].jer);
+    root.updateMatrixWorld(true);
+    const { clips, info } = prepClips(gb.animations, prefix, srcM, bones.Hips.parent.matrixWorld.clone(), bones.Hips.getWorldPosition(new THREE.Vector3()));
+    const h = new THREE.Box3().setFromObject(root).getSize(new THREE.Vector3()).y;
+    root.scale.multiplyScalar(MODEL_H / h);
+    const box = new THREE.Group(); box.add(root); scene.add(box);
+    const mixer = new THREE.AnimationMixer(root), acts = {};
+    for (const k in clips) acts[k] = mixer.clipAction(clips[k]);
+    rigs[team].mx = { box, bones, mixer, acts, info, cur: null, armW: { L: 0, R: 0 } };
+    rigs[team].root.visible = false;
+  }
+}
+
+function setAct(M, name, fade = .18) {
+  const a = M.acts[name] || M.acts.idle;
+  if (M.cur === name) return a;
+  const prev = M.cur && M.acts[M.cur];
+  a.reset(); a.paused = false; a.setEffectiveTimeScale(1); a.setEffectiveWeight(1);
+  const once = ONCE_CLIPS.includes(name);
+  a.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat); a.clampWhenFinished = once;
+  a.play(); if (prev) a.crossFadeFrom(prev, fade, true);
+  M.cur = name; return a;
+}
+
+function baseClip(p) {
+  const o = other(p), sp = hyp(p.vx, p.vy), f = fwdOf(p), r = rightOf(p);
+  const vf = p.vx * f.x + p.vy * f.y, vs = p.vx * r.x + p.vy * r.y;
+  const hasBall = ball.state === 'held' && ball.owner === p, oppHas = ball.state === 'held' && ball.owner === o;
+  if (G.state === 'over' || G.state === 'menu') return [G.state === 'over' && G.score[p.team] >= G.target ? 'victory' : hasBall ? 'dribble' : 'idle', 1];
+  if (p.stun > 0) return ['stumble', 1];
+  if (ball.state === 'dead' && G.pendingCheck !== p.team && sp < 4) return ['celebrate', 1];
+  if (sp < 1.5) return [hasBall ? 'dribble' : oppHas && G.state === 'play' ? 'defense' : 'idle', 1];
+  if (oppHas && Math.abs(vs) > Math.abs(vf)) return [vs > 0 ? 'shuffle_right' : 'shuffle_left', clamp(sp / 9, .7, 1.6)];
+  if (vf < -Math.abs(vs)) return ['backpedal', clamp(sp / 12, .6, 1.6)];
+  if (Math.abs(vs) > Math.abs(vf) * 1.2) return [vs > 0 ? 'strafe_right' : 'strafe_left', clamp(sp / 13, .6, 1.6)];
+  if (sp > 18) return ['sprint', clamp(sp / 21, .7, 1.5)];
+  return ['run', clamp(sp / 15, .6, 1.5)];
+}
+
+function airClip(p) {
+  if (p.dunkHang > 0) return ['hang', null];
+  const inAir = p.z > .02 || p.vz > 0;
+  if (!p.shot && !inAir) return null;
+  const name = p.shot ? { jumper: 'jump', layup: 'layup', dunk: 'dunk_jump' }[p.shot.type] : 'block';
+  const u = p.vz0 ? clamp((p.vz0 - p.vz) / (2 * p.vz0), 0, 1) : .5;
+  return [name, u];
+}
+
+function overrideArm(M, R, k, w) {
+  const a = R.arm[k], side = k === 'L' ? 'Left' : 'Right';
+  const up = M.bones[side + 'Arm'], fo = M.bones[side + 'ForeArm'], ha = M.bones[side + 'Hand'];
+  const sh = jp(a.sh), el = jp(a.el), wr = jp(a.el, 0, -.98, 0);
+  _q4.copy(up.quaternion); aimBone(up, fo, el.clone().sub(sh).normalize());
+  if (w < .999) { up.quaternion.slerpQuaternions(_q4, up.quaternion.clone(), w); up.updateMatrixWorld(true); }
+  _q4.copy(fo.quaternion); aimBone(fo, ha, wr.sub(el).normalize());
+  if (w < .999) { fo.quaternion.slerpQuaternions(_q4, fo.quaternion.clone(), w); fo.updateMatrixWorld(true); }
+}
+
+function driveMixamo(R, p, dt) {
+  const M = R.mx;
   M.box.position.set(p.x, p.z, p.y); M.box.rotation.y = p.face;
-  M.root.position.y = M.rootY + T.hy / MS;
-  M.box.updateMatrixWorld(true);
-  R.root.updateMatrixWorld(true);
-  const hips = jp(R.hips), neck = jp(R.torso, 0, 2.05, 0), head = jp(R.head, 0, .38, 0);
-  aimBone(B.Spine, B.Neck, neck.clone().sub(hips).normalize());
-  aimBone(B.Neck, B.Head, head.sub(neck).normalize());
+  const air = airClip(p);
+  if (air) {
+    const a = setAct(M, air[0], .1);
+    if (air[1] !== null) { a.paused = true; const inf = M.info[air[0]]; a.time = inf.t0 + air[1] * (inf.t1 - inf.t0); }
+  } else {
+    const [n, ts] = baseClip(p), a = setAct(M, n); a.paused = false; a.setEffectiveTimeScale(ts);
+  }
+  M.mixer.update(dt);
+  M.box.updateMatrixWorld(true); R.root.updateMatrixWorld(true);
+  const hasBall = ball.state === 'held' && ball.owner === p;
+  const both = (p.shot && p.shot.type === 'jumper') || hasBall || p.reach > 0;
   for (const k of ['L', 'R']) {
-    const a = R.arm[k], sh = jp(a.sh), el = jp(a.el), wr = jp(a.el, 0, -.98, 0);
-    aimBone(B[k + '_UpperArm'], B[k + '_Forearm'], el.clone().sub(sh).normalize());
-    aimBone(B[k + '_Forearm'], B[k + '_Hand'], wr.sub(el).normalize());
-    // 腿：兩段式 IK,腳踝跟著程序骨架、膝蓋朝程序骨架膝蓋方向
-    const l = R.leg[k], H = B[k + '_Thigh'].getWorldPosition(new THREE.Vector3());
-    const A = jp(l.an); A.y = Math.max(A.y, .33);
-    const pole = jp(l.kn);
-    const ha = A.clone().sub(H), dist = clamp(ha.length(), .2, M.thigh + M.calf - .01); ha.normalize();
-    const cosT = clamp((M.thigh * M.thigh + dist * dist - M.calf * M.calf) / (2 * M.thigh * dist), -1, 1), sinT = Math.sqrt(1 - cosT * cosT);
-    const po = pole.sub(H); po.sub(_c.copy(ha).multiplyScalar(po.dot(ha)));
-    if (po.lengthSq() < 1e-6) po.set(Math.sin(p.face), 0, Math.cos(p.face)); po.normalize();
-    const K = H.clone().addScaledVector(ha, M.thigh * cosT).addScaledVector(po, M.thigh * sinT);
-    const Af = H.clone().addScaledVector(ha, dist);
-    aimBone(B[k + '_Thigh'], B[k + '_Calf'], K.clone().sub(H).normalize());
-    aimBone(B[k + '_Calf'], B[k + '_Foot'], Af.sub(K).normalize());
-    aimBone(B[k + '_Foot'], B[k + '_Toe0'], _d.copy(M.footDir[k]).applyQuaternion(l.an.getWorldQuaternion(_q1)).normalize());
+    const want = both ? 1 : 0;
+    M.armW[k] += (want - M.armW[k]) * Math.min(1, dt * 14);
+    if (M.armW[k] > .02) overrideArm(M, R, k, M.armW[k]);
   }
 }
 
@@ -1087,7 +1149,7 @@ function poseRig(p, dt) {
     const a = R.arm[k], t = T[k]; a.sh.rotation.set(t.x, 0, a.s * t.z); a.el.rotation.x = t.e;
     const l = R.leg[k], u = T['l' + k]; l.hp.rotation.set(u.x, 0, l.s * u.z); l.kn.rotation.x = u.k; l.an.rotation.x = -(u.x + u.k) * .6;
   }
-  if (R.model) driveModel(R, T, p);
+  if (R.mx) driveMixamo(R, p, dt);
   R.ring.position.set(p.x, .03, p.y);
   R.ring.material.opacity = p.isAI ? .45 : .9;
 }
@@ -1306,7 +1368,7 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // 測試用掛勾
-window.__T = { THREE, G, ball, sync3D, update, aiUpdate, user, cpu, startGame, inp, setReadMove: f => { readMove = f; } };
+window.__T = { THREE, G, ball, sync3D, rigs, update, aiUpdate, user, cpu, startGame, inp, setReadMove: f => { readMove = f; } };
 </script>
 </body>
 </html>

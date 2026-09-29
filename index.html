@@ -974,6 +974,53 @@ function prepClips(anims, prefix, srcParentM, dstParentM, hipsRestW) {
   return { clips, info };
 }
 
+// CMU 動作捕捉(關節軌跡)→ 依目標骨架烘焙成 AnimationClip:骨盆用髖/頸建立座標系算旋轉，其餘骨頭對準子關節方向
+function bakeCMU(name, d, bones) {
+  const J = d.joints, fp = (fr, n) => { const i = J.indexOf(n) * 3; return new THREE.Vector3(fr[i], fr[i + 1], fr[i + 2]); };
+  const names = Object.keys(bones), rest = {};
+  for (const n of names) rest[n] = bones[n].quaternion.clone();
+  const hips = bones.Hips, hipsRestLocal = hips.position.clone();
+  const wpos = n => bones[n].getWorldPosition(new THREE.Vector3());
+  const basis = (L, R, N, Hh) => {
+    const x = L.clone().sub(R).normalize(), y = N.clone().sub(Hh);
+    y.sub(x.clone().multiplyScalar(y.dot(x))).normalize();
+    return new THREE.Matrix4().makeBasis(x, y, new THREE.Vector3().crossVectors(x, y));
+  };
+  hips.parent.updateMatrixWorld(true); hips.updateMatrixWorld(true);
+  const BtInv = basis(wpos('LeftUpLeg'), wpos('RightUpLeg'), wpos('Neck'), wpos('Hips')).transpose();
+  const hipsRestWQ = hips.getWorldQuaternion(new THREE.Quaternion()), hipsRestW = wpos('Hips');
+  const vals = {}; names.forEach(n => vals[n] = []); const hipPos = [], times = [];
+  const chain = [['Spine', 'Neck', 'Hips', 'Neck'], ['Neck', 'Head', 'Neck', 'Head']];
+  for (const S of ['Left', 'Right']) chain.push(
+    [S + 'Shoulder', S + 'Arm', S + 'Shoulder', S + 'Arm'], [S + 'Arm', S + 'ForeArm', S + 'Arm', S + 'ForeArm'],
+    [S + 'ForeArm', S + 'Hand', S + 'ForeArm', S + 'Hand'], [S + 'Hand', S + 'HandMiddle1', S + 'Hand', S + 'FingerBase'],
+    [S + 'UpLeg', S + 'Leg', S + 'UpLeg', S + 'Leg'], [S + 'Leg', S + 'Foot', S + 'Leg', S + 'Foot'], [S + 'Foot', S + 'ToeBase', S + 'Foot', S + 'ToeBase']);
+  d.frames.forEach((fr, i) => {
+    for (const n of names) bones[n].quaternion.copy(rest[n]);
+    hips.position.copy(hipsRestLocal); hips.updateMatrixWorld(true);
+    const R = basis(fp(fr, 'LeftUpLeg'), fp(fr, 'RightUpLeg'), fp(fr, 'Neck'), fp(fr, 'Hips')).multiply(BtInv);
+    const wq = new THREE.Quaternion().setFromRotationMatrix(R).multiply(hipsRestWQ);
+    hips.quaternion.copy(hips.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(wq));
+    const wy = Math.min(hipsRestW.y + fp(fr, 'Hips').y - d.hipsRest, hipsRestW.y);   // 起跳高度交給遊戲物理
+    hips.position.copy(hips.parent.worldToLocal(new THREE.Vector3(hipsRestW.x, wy, hipsRestW.z)));
+    hips.updateMatrixWorld(true);
+    for (const [b, tip, from, to] of chain) if (bones[b] && bones[tip]) aimBone(bones[b], bones[tip], fp(fr, to).sub(fp(fr, from)).normalize());
+    times.push(i / d.fps);
+    for (const n of names) vals[n].push(...bones[n].quaternion.toArray());
+    hipPos.push(...hips.position.toArray());
+  });
+  if (d.loop) {
+    times.push(d.frames.length / d.fps);
+    for (const n of names) vals[n].push(...vals[n].slice(0, 4));
+    hipPos.push(...hipPos.slice(0, 3));
+  }
+  for (const n of names) bones[n].quaternion.copy(rest[n]);
+  hips.position.copy(hipsRestLocal);
+  const tracks = names.map(n => new THREE.QuaternionKeyframeTrack(bones[n].name + '.quaternion', times, vals[n]));
+  tracks.push(new THREE.VectorKeyframeTrack(hips.name + '.position', times, hipPos));
+  return new THREE.AnimationClip(name, times[times.length - 1], tracks);
+}
+
 function recolorShirt(root, hex) {
   const [tr, tg, tb] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
   root.traverse(o => {
@@ -993,7 +1040,8 @@ function recolorShirt(root, hex) {
 
 async function loadPlayers() {
   const L = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-  const [gb, gd] = await Promise.all([L.loadAsync('./assets/bryce.glb'), L.loadAsync('./assets/david.glb')]);
+  const [gb, gd, cmu] = await Promise.all([L.loadAsync('./assets/bryce.glb'), L.loadAsync('./assets/david.glb'),
+    fetch('./assets/cmu_clips.json').then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
   const hipsParentM = g => { let h; g.scene.updateMatrixWorld(true); g.scene.traverse(o => { if (o.isBone && /Hips$/.test(o.name)) h = o; }); return h.parent.matrixWorld.clone(); };
   const srcM = hipsParentM(gb);
   for (const [g, team] of [[gb, 0], [gd, 1]]) {
@@ -1014,6 +1062,7 @@ async function loadPlayers() {
     const h = new THREE.Box3().setFromObject(root).getSize(new THREE.Vector3()).y;
     root.scale.multiplyScalar(MODEL_H / h);
     const box = new THREE.Group(); box.add(root); scene.add(box);
+    for (const k in cmu) { clips[k] = bakeCMU(k, cmu[k], bones); info[k] = { t0: cmu[k].t0, t1: cmu[k].t1 }; }
     const mixer = new THREE.AnimationMixer(root), acts = {};
     for (const k in clips) acts[k] = mixer.clipAction(clips[k]);
     rigs[team].mx = { box, bones, mixer, acts, info, cur: null, armW: { L: 0, R: 0 } };
@@ -1040,7 +1089,7 @@ function baseClip(p) {
   if (p.stun > 0) return ['stumble', 1];
   if (ball.state === 'dead' && G.pendingCheck !== p.team && sp < 4) return ['celebrate', 1];
   if (sp < 1.5) return [hasBall ? 'dribble' : oppHas && G.state === 'play' ? 'defense' : 'idle', 1];
-  if (oppHas && Math.abs(vs) > Math.abs(vf)) return [vs > 0 ? 'shuffle_right' : 'shuffle_left', clamp(sp / 9, .7, 1.6)];
+  if (oppHas && Math.abs(vs) > Math.abs(vf)) return [vs > 0 ? 'shuffle_right' : 'shuffle_left', clamp(sp / 10.5, .6, 1.5)];
   if (vf < -Math.abs(vs)) return ['backpedal', clamp(sp / 12, .6, 1.6)];
   if (Math.abs(vs) > Math.abs(vf) * 1.2) return [vs > 0 ? 'strafe_right' : 'strafe_left', clamp(sp / 13, .6, 1.6)];
   if (sp > 18) return ['sprint', clamp(sp / 21, .7, 1.5)];
@@ -1070,7 +1119,12 @@ function driveMixamo(R, p, dt) {
   const M = R.mx;
   M.box.position.set(p.x, p.z, p.y); M.box.rotation.y = p.face;
   const air = airClip(p);
-  if (air) {
+  if (air && air[0] === 'jump' && M.acts.jumpshot) {
+    // CMU 真人跳投：含一小段舉球預備，落地後收尾
+    air[0] = 'jumpshot'; const inf = M.info.jumpshot;
+    const a = setAct(M, 'jumpshot', .08); a.paused = true;
+    a.time = clamp(inf.t0 - .18 + air[1] * (inf.t1 - inf.t0 + .21), 0, a.getClip().duration);
+  } else if (air) {
     const a = setAct(M, air[0], .1);
     if (air[1] !== null) { a.paused = true; const inf = M.info[air[0]]; a.time = inf.t0 + air[1] * (inf.t1 - inf.t0); }
   } else {
@@ -1079,7 +1133,7 @@ function driveMixamo(R, p, dt) {
   M.mixer.update(dt);
   M.box.updateMatrixWorld(true); R.root.updateMatrixWorld(true);
   const hasBall = ball.state === 'held' && ball.owner === p;
-  const both = (p.shot && p.shot.type === 'jumper') || hasBall || p.reach > 0;
+  const both = (hasBall && !p.shot) || p.reach > 0 || (p.shot && p.shot.type === 'jumper' && !M.acts.jumpshot);
   for (const k of ['L', 'R']) {
     const want = both ? 1 : 0;
     M.armW[k] += (want - M.armW[k]) * Math.min(1, dt * 14);
@@ -1174,6 +1228,12 @@ let crowdWas = 0;
 function sync3D(dt) {
   for (const p of G.players) poseRig(p, dt);
   ballMesh.position.set(ball.x, ball.z, ball.y);
+  const bo = ball.owner;
+  if (ball.state === 'held' && bo && bo.shot && !bo.shot.rel && rigs[bo.team].mx) {
+    const B = rigs[bo.team].mx.bones, f = fwdOf(bo);
+    B.RightHandMiddle1.getWorldPosition(_a); B.LeftHandMiddle1.getWorldPosition(_b);
+    ballMesh.position.copy(_a).add(_b).multiplyScalar(.5).add(new THREE.Vector3(f.x * .45, .25, f.y * .45));
+  }
   if (ball.state === 'flight') ballMesh.rotation.x -= dt * 14;
   else if (ball.state === 'held') ballMesh.rotation.x += dt * 9;
   else ballMesh.rotation.x += dt * hyp(ball.vx, ball.vy) * 2.5;

@@ -20,4 +20,8 @@
 | 花式運球 / 抄截 | E | 花式/抄截鈕 |
 | 暫停 | P / Esc | ⏸ |
 
-`index.html` + 內附 Three.js r160(`lib/`)：寫實球員模型 + 程序動畫重定向到骨架、籃架、籃網與觀眾，即時陰影與程序動畫，音效用 WebAudio 合成，不依賴外部 CDN。原創作品，與任何職業聯盟或遊戲公司無關。
+`index.html` + 內附 Three.js r160(`lib/`)：寫實球員模型(程序動畫即時重定向到骨架)、程式建模的籃架、籃網與觀眾，即時陰影，音效用 WebAudio 合成，不依賴外部 CDN。原創作品，與任何職業聯盟或遊戲公司無關。
+
+## 素材授權
+- 球員模型與貼圖：[Microsoft Rocketbox](https://github.com/microsoft/Microsoft-Rocketbox) `Sports_Male_04`(MIT License,見 `assets/ROCKETBOX_LICENSE.txt`),貼圖縮為 1024,執行時依隊伍重新上色
+- 3D 引擎：[three.js](https://threejs.org/) r160(MIT)

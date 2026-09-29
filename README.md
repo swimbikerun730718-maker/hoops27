@@ -1,6 +1,6 @@
 # HOOPS 27 · 街頭鬥牛 🏀
 
-網頁版 1v1 街頭籃球，打開瀏覽器就能玩，電腦跟手機都支援。
+3D 網頁版 1v1 街頭籃球(Three.js),打開瀏覽器就能玩，電腦跟手機都支援。
 
 **▶ 立即遊玩：https://swimbikerun730718-maker.github.io/hoops27/**
 

@@ -5,25 +5,26 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#07090f">
 <title>HOOPS 27 · 街頭鬥牛</title>
-<meta name="description" content="網頁版 1v1 街頭籃球：投籃時機條、晃倒、灌籃、火鍋、抄截。電腦與手機都能玩。">
+<meta name="description" content="3D 網頁版 1v1 街頭籃球：投籃時機條、晃倒、灌籃、火鍋、抄截。電腦與手機都能玩。">
 <meta property="og:title" content="HOOPS 27 · 街頭鬥牛">
-<meta property="og:description" content="網頁版 1v1 街頭籃球，打開就能玩。">
+<meta property="og:description" content="3D 網頁版 1v1 街頭籃球，打開就能玩。">
 <style>
 :root{--bg:#07090f;--accent:#ff7a1a;--txt:#f3f5fa;--mut:#9aa3b5;--card:#131927;--line:#22293a}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;background:var(--bg);color:var(--txt);font-family:"PingFang TC","Microsoft JhengHei","Noto Sans CJK TC","Noto Sans TC",system-ui,sans-serif;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
 #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000}
-canvas{display:block;width:min(100vw,calc(100vh*16/9));aspect-ratio:16/9;background:#000}
-.overlay{position:fixed;inset:0;display:flex;align-items:safe center;justify-content:center;background:radial-gradient(ellipse at center,rgba(20,26,44,.88),rgba(4,6,10,.97));z-index:10;overflow:auto;padding:16px}
+#stage{position:relative;width:min(100vw,calc(100vh*16/9));aspect-ratio:16/9}
+#stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.overlay{position:fixed;inset:0;display:flex;align-items:safe center;justify-content:center;background:radial-gradient(ellipse at center,rgba(12,16,28,.62),rgba(4,6,10,.9));z-index:10;overflow:auto;padding:16px}
 .hidden{display:none!important}
 .panel{max-width:940px;width:100%;text-align:center;margin:auto}
-h1{font-size:clamp(40px,8vw,84px);font-weight:900;letter-spacing:2px;font-style:italic;background:linear-gradient(90deg,#ffb347,#ff5e3a 50%,#ff2d75);-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1.05}
+h1{font-size:clamp(40px,8vw,84px);font-weight:900;letter-spacing:2px;font-style:italic;background:linear-gradient(90deg,#ffb347,#ff5e3a 50%,#ff2d75);-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1.05;filter:drop-shadow(0 4px 18px rgba(255,80,60,.35))}
 h2{font-size:clamp(28px,5vw,48px);font-weight:900;font-style:italic}
-.sub{color:var(--mut);margin:6px 0 10px;font-size:15px}
+.sub{color:#c3cad8;margin:6px 0 10px;font-size:15px}
 .label{font-size:12px;color:var(--mut);margin:16px 0 8px;letter-spacing:3px}
 .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 @media(max-width:760px){.cards{grid-template-columns:repeat(2,1fr)}}
-.card{background:var(--card);border:2px solid var(--line);border-radius:14px;padding:12px 10px;cursor:pointer;transition:border-color .15s,box-shadow .15s;text-align:left;color:var(--txt);font:inherit}
+.card{background:rgba(19,25,39,.88);border:2px solid var(--line);border-radius:14px;padding:12px 10px;cursor:pointer;transition:border-color .15s,box-shadow .15s;text-align:left;color:var(--txt);font:inherit;backdrop-filter:blur(6px)}
 .card:hover{border-color:#3a4560}
 .card.sel{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,122,26,.22)}
 .card .nm{font-weight:800;font-size:16px}
@@ -32,13 +33,14 @@ h2{font-size:clamp(28px,5vw,48px);font-weight:900;font-style:italic}
 .stat b{width:30px;font-weight:600}
 .bar{flex:1;height:5px;background:#252c3d;border-radius:3px;overflow:hidden}
 .bar i{display:block;height:100%;background:linear-gradient(90deg,#ff9a3c,#ff4d6d)}
-.seg{display:inline-flex;background:var(--card);border-radius:12px;padding:4px;gap:4px;border:1px solid var(--line)}
+.seg{display:inline-flex;background:rgba(19,25,39,.9);border-radius:12px;padding:4px;gap:4px;border:1px solid var(--line)}
 .seg button{border:0;background:transparent;color:var(--mut);padding:8px 16px;border-radius:9px;font:inherit;font-weight:700;cursor:pointer}
 .seg button.sel{background:var(--accent);color:#1a0d00}
 .row{display:flex;gap:22px;justify-content:center;flex-wrap:wrap}
 .go{margin-top:22px;border:0;background:linear-gradient(90deg,#ff9a3c,#ff4d6d);color:#fff;font:inherit;font-weight:900;font-size:20px;padding:14px 48px;border-radius:999px;cursor:pointer;letter-spacing:3px;box-shadow:0 8px 30px rgba(255,77,109,.35)}
+.go:disabled{opacity:.5;cursor:wait}
 .go.ghost{background:transparent;border:2px solid #3a4560;box-shadow:none;font-size:16px;padding:11px 32px;margin-left:8px}
-.help{margin-top:18px;font-size:12.5px;color:var(--mut);line-height:1.9}
+.help{margin-top:18px;font-size:12.5px;color:#aab2c3;line-height:1.9}
 kbd{background:#1c2334;border:1px solid #2e3850;border-bottom-width:2px;border-radius:5px;padding:1px 6px;font-family:inherit;font-size:12px;color:#dfe5f2}
 table.st{margin:16px auto;border-collapse:collapse;font-size:15px}
 table.st td,table.st th{padding:7px 18px;border-bottom:1px solid var(--line)}
@@ -62,7 +64,7 @@ table.st td:first-child{color:var(--mut);text-align:left}
 </style>
 </head>
 <body>
-<div id="wrap"><canvas id="c"></canvas></div>
+<div id="wrap"><div id="stage"><canvas id="gl"></canvas><canvas id="hud"></canvas></div></div>
 
 <div id="touch" class="hidden">
   <div id="stick"><div id="knob"></div></div>
@@ -75,14 +77,14 @@ table.st td:first-child{color:var(--mut);text-align:left}
 <div class="overlay" id="menu">
   <div class="panel">
     <h1>HOOPS 27</h1>
-    <div class="sub">街頭 1v1 鬥牛 · 抓準時機出手、晃倒對手、隔扣封阻</div>
+    <div class="sub">3D 街頭 1v1 鬥牛 · 抓準時機出手、晃倒對手、隔扣封阻</div>
     <div class="label">選擇你的球員</div>
     <div class="cards" id="cards"></div>
     <div class="row">
       <div><div class="label">難度</div><div class="seg" id="segDiff"></div></div>
       <div><div class="label">目標分數</div><div class="seg" id="segTarget"></div></div>
     </div>
-    <button class="go" id="btnStart">開始比賽</button>
+    <button class="go" id="btnStart" disabled>載入中…</button>
     <div class="help" id="helpKeys">
       <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 方向鍵 移動　<kbd>Shift</kbd> 衝刺<br>
       <kbd>空白鍵</kbd> 按住起跳、<b>在最高點放開</b>出手(時機條綠區=完美)· 禁區衝刺按下=灌籃<br>
@@ -110,18 +112,20 @@ table.st td:first-child{color:var(--mut);text-align:left}
 
 <div id="rotate"><div class="ic">📱</div>請將手機橫放來玩</div>
 
-<script>
-'use strict';
+<script type="importmap">{"imports":{"three":"./lib/three.module.min.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from './lib/RoomEnvironment.js';
+
 // ================= 基本設定 =================
-const cv = document.getElementById('c'), ctx = cv.getContext('2d');
-const W = 1280, H = 720; cv.width = W; cv.height = H;
+const $ = id => document.getElementById(id);
+const hud = $('hud'), ctx = hud.getContext('2d');
+const W = 1280, H = 720; hud.width = W; hud.height = H;
 const FONT = '"PingFang TC","Microsoft JhengHei","Noto Sans CJK TC","Noto Sans TC",sans-serif';
-const HOOP = { x: 0, y: 5.25, z: 10 };           // 單位：英尺；y=0 為底線，y=47 為中線
-const CAM = { y: 95, h: 38, f: 1250, hor: -229 };
+const HOOP = { x: 0, y: 5.25, z: 10 };           // 單位：英尺；y=0 底線、y=47 中線、z=高度
 const SHOT_CLOCK = 14;
 const IS_TOUCH = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 
-function P(x, y, z = 0) { const d = CAM.y - y, s = CAM.f / d; return { x: W / 2 + x * s, y: CAM.hor + (CAM.h - z) * s, s }; }
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const rnd = (a, b) => a + Math.random() * (b - a);
 const hyp = Math.hypot;
@@ -129,6 +133,8 @@ const pick = a => a[Math.floor(Math.random() * a.length)];
 function gauss() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
 const dHoop = o => hyp(o.x - HOOP.x, o.y - HOOP.y);
 const beyondArc = (x, y) => y < 14.2 ? Math.abs(x) >= 22 : hyp(x, y - HOOP.y) >= 23.75;
+const fwdOf = p => ({ x: Math.sin(p.face), y: Math.cos(p.face) });
+const rightOf = p => ({ x: -Math.cos(p.face), y: Math.sin(p.face) });
 
 const ARCHS = [
   { id: 'shooter', nm: '神射手', ds: '三分雨、出手穩，切入普通', r: { spd: .88, three: .93, mid: .86, inside: .62, dunk: .35, handle: .78, def: .6, stl: .62, blk: .38 } },
@@ -149,8 +155,8 @@ const SPOTS = {
   allround: [[-14, 18], [14, 18], [0, 24], [-20, 8], [20, 8], [0, 15]],
 };
 const COLS = [
-  { jer: '#1f6fff', shorts: '#1848b0', trim: '#ffd23f', skin: '#c98d5d', hair: '#1b1b1b', shoe: '#f4f4f4', num: '#fff' },
-  { jer: '#e8334a', shorts: '#a81d35', trim: '#ffffff', skin: '#7a4b30', hair: '#0e0e0e', shoe: '#161616', num: '#fff' },
+  { jer: '#1f6fff', shorts: '#1848b0', trim: '#ffd23f', skin: '#c98d5d', hair: '#1b1b1b', shoe: '#f4f4f4', num: '#ffffff', ring: '#ffd23f' },
+  { jer: '#e8334a', shorts: '#a81d35', trim: '#ffffff', skin: '#7a4b30', hair: '#0e0e0e', shoe: '#1a1a1a', num: '#ffffff', ring: '#ff4d6d' },
 ];
 
 // ================= 音效(WebAudio 合成) =================
@@ -199,7 +205,7 @@ function mkPlayer(team, arch, isAI) {
   if (isAI) for (const k in r) r[k] = Math.min(.99, r[k] * G.diff.ai);
   return {
     team, arch, isAI, r, col: COLS[team], num: team === 0 ? 7 : 11,
-    x: 0, y: 30, z: 0, vx: 0, vy: 0, vz: 0, stam: 100, sprint: false,
+    x: 0, y: 30, z: 0, vx: 0, vy: 0, vz: 0, face: Math.PI, stam: 100, sprint: false,
     stun: 0, reach: 0, dashT: 0, dashDx: 0, dashDy: 0, dashCd: 0, stealCd: 0, lastDash: 1,
     shot: null, dunkHang: 0, anim: 0, side: 1, pop: null, meter: null,
     ai: { decT: 0, mode: 'spot', tx: 0, ty: 26, contestT: -1, stealT: rnd(1, 2), releaseAt: .9, jumpCd: 0 },
@@ -255,7 +261,6 @@ function release(p) {
       pop(p, T[0], T[1]); p.meter = { v: s.meter, tq, t: 0 };
     }
   }
-  // 封阻判定
   const oAir = o.z > .7;
   const front = ((HOOP.x - p.x) * (o.x - p.x) + (HOOP.y - p.y) * (o.y - p.y)) > -1;
   if (oAir && front && o.stun <= 0 && dd < (s.type === 'jumper' ? 4 : 4.8)) {
@@ -288,7 +293,8 @@ function makeProb(p, s, tq, timing, dd, oAirClose) {
 }
 
 function launch(p, s, make, pts, tq) {
-  const sx = p.x + p.side * .3, sy = p.y, sz = p.z + (s.type === 'jumper' ? 8.6 : 8.3);
+  const f = fwdOf(p);
+  const sx = p.x + f.x * .5, sy = p.y + f.y * .5, sz = p.z + (s.type === 'jumper' ? 8.4 : 8.3);
   let ex = HOOP.x, ey = HOOP.y, ez = HOOP.z + .3;
   if (!make) { const a = rnd(0, Math.PI * 2); ex += Math.cos(a) * .85; ey += Math.sin(a) * .85; ez = HOOP.z + .2; }
   let T, Hh;
@@ -300,7 +306,8 @@ function launch(p, s, make, pts, tq) {
   ball.x = sx; ball.y = sy; ball.z = sz;
   G.offense = p.team;
   if (s.type === 'dunk' && make) {
-    p.dunkHang = .5; p.x = HOOP.x + (p.x - HOOP.x) * .25; p.y = HOOP.y + 1.1; p.vx = p.vy = 0; p.z = 3;
+    p.dunkHang = .5; p.x = HOOP.x + (p.x - HOOP.x) * .25; p.y = HOOP.y + 1.3; p.vx = p.vy = 0; p.z = 2.4;
+    p.face = Math.atan2(HOOP.x - p.x, HOOP.y - p.y);
   }
 }
 
@@ -320,8 +327,8 @@ function dribbleMove(p) {
   let dir = -p.lastDash;
   if (!p.isAI && inp.mx) dir = Math.sign(inp.mx * px) || dir;
   p.lastDash = dir;
-  let dx = px * dir * .9 + hx / hl * .35, dy = py * dir * .9 + hy / hl * .35;
-  const dl = hyp(dx, dy); p.dashDx = dx / dl; p.dashDy = dy / dl;
+  const dx = px * dir * .9 + hx / hl * .35, dy = py * dir * .9 + hy / hl * .35, dl = hyp(dx, dy);
+  p.dashDx = dx / dl; p.dashDy = dy / dl;
   p.dashT = .28; p.dashCd = .9; p.stam = Math.max(0, p.stam - 10); p.side = -p.side;
   sfx.bounce(1);
   if (!p.isAI) pop(p, pick(['胯下運球', '背後運球', '交叉步', '轉身']), '#9fd0ff');
@@ -369,7 +376,7 @@ function checkBall(team) {
   G.state = 'check'; G.checkT = 1.3; G.offense = team; G.needsClear = [false, false]; G.shotClock = SHOT_CLOCK;
   const o = G.players[team], d = G.players[1 - team];
   const reset = { z: 0, vx: 0, vy: 0, vz: 0, shot: null, stun: 0, reach: 0, dunkHang: 0, dashT: 0 };
-  Object.assign(o, reset, { x: 0, y: 32 }); Object.assign(d, reset, { x: 0, y: 26.5 });
+  Object.assign(o, reset, { x: 0, y: 32, face: Math.PI }); Object.assign(d, reset, { x: 0, y: 26.5, face: 0 });
   ball.state = 'held'; ball.owner = o; ball.lastTouch = team; ball.f = null;
   sfx.whistle();
 }
@@ -389,14 +396,14 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => { const k = e.key.toLowerCase(); keys[k] = false; if (k === ' ' || k === 'j') actPrimary(false); });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; if (G.state === 'play' || G.state === 'check') togglePause(); });
 
-function readMove() {
+let readMove = function () {
   let x = 0, y = 0;
   if (keys['a'] || keys['arrowleft']) x--; if (keys['d'] || keys['arrowright']) x++;
   if (keys['w'] || keys['arrowup']) y--; if (keys['s'] || keys['arrowdown']) y++;
   if (touch.active) { x = touch.x; y = touch.y; }
   const m = hyp(x, y); if (m > 1) { x /= m; y /= m; }
   inp.mx = x; inp.my = y; inp.sprint = !!(keys['shift'] || touch.sprint);
-}
+};
 function actPrimary(down) {
   au();
   if (G.state !== 'play') return;
@@ -411,9 +418,8 @@ function actSecondary() {
   if (ball.state === 'held' && ball.owner === p) dribbleMove(p); else trySteal(p);
 }
 
-// 觸控
 (function setupTouch() {
-  const stick = document.getElementById('stick'), knob = document.getElementById('knob');
+  const stick = $('stick'), knob = $('knob');
   let sid = null;
   const setKnob = (x, y) => { knob.style.transform = `translate(${x}px,${y}px)`; };
   const move = e => {
@@ -428,9 +434,9 @@ function actSecondary() {
   const end = e => { if (e.pointerId !== sid) return; sid = null; touch.active = false; touch.x = touch.y = 0; setKnob(0, 0); };
   stick.addEventListener('pointerup', end); stick.addEventListener('pointercancel', end);
   const btn = (id, down, up) => {
-    const el = document.getElementById(id);
+    const el = $(id);
     el.addEventListener('pointerdown', e => { e.preventDefault(); el.setPointerCapture(e.pointerId); el.classList.add('on'); down(); });
-    const u = e => { el.classList.remove('on'); up && up(); };
+    const u = () => { el.classList.remove('on'); up && up(); };
     el.addEventListener('pointerup', u); el.addEventListener('pointercancel', u);
   };
   btn('bShoot', () => actPrimary(true), () => actPrimary(false));
@@ -470,7 +476,7 @@ function aiUpdate(p, dt) {
     if (!p.shot) {
       if (a.mode === 'clear') {
         const ux = (p.x - HOOP.x) / (dh || 1), uy = Math.max(.35, (p.y - HOOP.y) / (dh || 1)), ul = hyp(ux, uy);
-        goTo(clamp(HOOP.x + ux / ul * 26.5, -23.5, 23.5), clamp(HOOP.y + uy / ul * 26.5, 1, 44), .3);
+        goTo(clamp(HOOP.x + ux / ul * 26.5, -23.5, 23.5), clamp(HOOP.y + uy / ul * 26.5, 1, 42), .3);
       } else if (a.mode === 'drive') { goTo(HOOP.x, HOOP.y + 2, .1); spr = p.stam > 20; }
       else goTo(a.tx, a.ty);
     }
@@ -495,6 +501,23 @@ function aiUpdate(p, dt) {
 }
 
 // ================= 更新 =================
+function updFacing(p, dt) {
+  const o = other(p), sp = hyp(p.vx, p.vy);
+  let tx, ty;
+  if (p.dunkHang > 0 || p.shot) { tx = HOOP.x - p.x; ty = HOOP.y - p.y; }
+  else if (G.state === 'check') { tx = o.x - p.x; ty = o.y - p.y; }
+  else if (ball.state === 'held' && ball.owner === o) { tx = o.x - p.x; ty = o.y - p.y; }
+  else if (ball.owner === p) {
+    const hx = HOOP.x - p.x, hy = HOOP.y - p.y;
+    if (sp > 4 && p.vx * hx + p.vy * hy < -sp * hyp(hx, hy) * .3) { tx = p.vx; ty = p.vy; } else { tx = hx; ty = hy; }
+  } else if (sp > 2) { tx = p.vx; ty = p.vy; }
+  else if (ball.state !== 'held') { tx = ball.x - p.x; ty = ball.y - p.y; }
+  else { tx = HOOP.x - p.x; ty = HOOP.y - p.y; }
+  if (!tx && !ty) return;
+  const ta = Math.atan2(tx, ty); let d = ta - p.face; d = Math.atan2(Math.sin(d), Math.cos(d));
+  p.face += d * Math.min(1, dt * 12);
+}
+
 function updPlayer(p, dt, mx, my, sprint) {
   p.stun = Math.max(0, p.stun - dt); p.reach = Math.max(0, p.reach - dt);
   p.dashCd = Math.max(0, p.dashCd - dt); p.stealCd = Math.max(0, p.stealCd - dt);
@@ -531,8 +554,8 @@ function updPlayer(p, dt, mx, my, sprint) {
     if (p.vz < 0) { p.vz = 0; if (p.shot) { if (!p.shot.rel) release(p); p.shot = null; } }
   }
   p.x = clamp(p.x, -24.3, 24.3); p.y = clamp(p.y, .6, 43);
-  const sp = hyp(p.vx, p.vy); p.anim += sp * dt * .55;
-  if (Math.abs(p.vx) > 1 && !p.shot) p.side = p.vx > 0 ? 1 : -1;
+  p.anim += hyp(p.vx, p.vy) * dt * .62;
+  updFacing(p, dt);
 }
 
 function separate() {
@@ -544,17 +567,18 @@ function separate() {
 
 function updBall(dt) {
   if (ball.state === 'held') {
-    const p = ball.owner;
+    const p = ball.owner, f = fwdOf(p), r = rightOf(p);
     if (p.shot && !p.shot.rel) {
-      ball.x = p.x + p.side * .2; ball.y = p.y - .1;
-      ball.z = p.z + (p.shot.type === 'jumper' ? 6.8 + Math.min(1, p.shot.t / .3) * 1.6 : 6 + Math.min(1, p.shot.t / .42) * 2.6);
-    } else if (G.state === 'check') { ball.x = p.x + p.side * 1.1; ball.y = p.y + .3; ball.z = 3.4; }
+      ball.x = p.x + f.x * .55; ball.y = p.y + f.y * .55;
+      ball.z = p.z + (p.shot.type === 'jumper' ? 6.9 + Math.min(1, p.shot.t / .25) * 1.3 : 6.2 + Math.min(1, p.shot.t / .42) * 2.8);
+    } else if (G.state === 'check') { ball.x = p.x + f.x * 1.05; ball.y = p.y + f.y * 1.05; ball.z = 4.1; }
     else {
       ball.ph += dt * (7 + hyp(p.vx, p.vy) * .35);
       const s = Math.abs(Math.sin(ball.ph));
       if (s < .15 && ball.prevS >= .15 && G.state === 'play') sfx.bounce(.3);
       ball.prevS = s;
-      ball.x = p.x + p.side * 1.15; ball.y = p.y + .35; ball.z = .4 + s * 2.6 + p.z;
+      ball.x = p.x + r.x * p.side * 1.05 + f.x * .6; ball.y = p.y + r.y * p.side * 1.05 + f.y * .6;
+      ball.z = .39 + s * 2.75 + p.z;
     }
   } else if (ball.state === 'flight') {
     const f = ball.f; f.t += dt; const u = Math.min(1, f.t / f.T);
@@ -566,8 +590,8 @@ function updBall(dt) {
     if (ball.state === 'dead' && ball.z > 8.2) { ball.x = HOOP.x; ball.y = HOOP.y; }
     else { ball.x += ball.vx * dt; ball.y += ball.vy * dt; }
     ball.z += ball.vz * dt;
-    if (ball.z < .4) {
-      ball.z = .4;
+    if (ball.z < .39) {
+      ball.z = .39;
       if (ball.vz < -3) { ball.vz = -ball.vz * .62; sfx.bounce(.6); } else ball.vz = 0;
       const fr = Math.pow(.35, dt); ball.vx *= fr; ball.vy *= fr;
     }
@@ -631,6 +655,7 @@ function update(dt) {
   G.msgs.forEach(m => m.t += dt); G.msgs = G.msgs.filter(m => m.t < m.dur);
   G.net = Math.max(0, G.net - dt); G.rimShake = Math.max(0, G.rimShake - dt);
   G.crowd = Math.max(0, G.crowd - dt); G.board = Math.max(0, G.board - dt);
+  if (G.state === 'menu') { updBall(dt); return; }
   if (G.state === 'check') {
     G.checkT -= dt; updBall(dt);
     if (G.checkT <= 0) G.state = 'play';
@@ -647,198 +672,362 @@ function update(dt) {
   if (G.state === 'play') rules(dt);
 }
 
-// ================= 繪圖 =================
-function poly3(pts, fill, stroke, lw) {
-  ctx.beginPath();
-  pts.forEach((q, i) => { const s = P(q[0], q[1], q[2] || 0); i ? ctx.lineTo(s.x, s.y) : ctx.moveTo(s.x, s.y); });
-  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
-  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+// ================= 3D 場景 =================
+const renderer = new THREE.WebGLRenderer({ canvas: $('gl'), antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, IS_TOUCH ? 1.5 : 2));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#04060b');
+scene.fog = new THREE.Fog('#04060b', 95, 175);
+const camera = new THREE.PerspectiveCamera(40, 16 / 9, .5, 400);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), .04).texture;
+const MAX_ANISO = renderer.capabilities.getMaxAnisotropy();
+
+const std = (color, roughness = .6, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness, ...extra });
+function mesh(geo, mat, parent, x = 0, y = 0, z = 0, shadow = true) {
+  const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z);
+  m.castShadow = shadow; m.receiveShadow = shadow; (parent || scene).add(m); return m;
 }
-function arcPts(cx, cy, r, a0, a1, n = 40, z = 0) { const o = []; for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * i / n; o.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r, z]); } return o; }
+function canvasTex(w, h, draw) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = MAX_ANISO; return t;
+}
+
+// 燈光
+scene.add(new THREE.HemisphereLight('#c8d4ff', '#3a2414', .45));
+const sun = new THREE.DirectionalLight('#fff3e2', 2.4);
+sun.position.set(14, 70, 44); sun.target.position.set(0, 0, 20);
+sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -38, right: 38, top: 42, bottom: -42, near: 20, far: 160 });
+sun.shadow.bias = -.0004; sun.shadow.normalBias = .03;
+scene.add(sun, sun.target);
+const fill = new THREE.DirectionalLight('#9fb6ff', .5); fill.position.set(-30, 30, 70); scene.add(fill);
+
+// 球場地板(Canvas 繪製木紋與標線)
+const courtTex = canvasTex(2000, 1880, (g, cw, ch) => {
+  const S = 40, X = x => (x + 25) * S, Y = y => y * S;
+  for (let x = 0; x < cw; x += 20) {
+    let y = -Math.random() * 400;
+    while (y < ch) {
+      const len = 220 + Math.random() * 520;
+      g.fillStyle = `hsl(${28 + Math.random() * 6},${52 + Math.random() * 12}%,${55 + Math.random() * 9}%)`;
+      g.fillRect(x, y, 20, len);
+      g.fillStyle = 'rgba(70,35,12,.28)'; g.fillRect(x, y, 1.2, len); g.fillRect(x, y, 20, 1.6);
+      y += len;
+    }
+  }
+  g.globalAlpha = .05;
+  for (let i = 0; i < 14000; i++) { g.fillStyle = Math.random() < .5 ? '#000' : '#fff'; g.fillRect(Math.random() * cw, Math.random() * ch, 1, 6 + Math.random() * 40); }
+  g.globalAlpha = 1;
+  g.fillStyle = 'rgba(176,42,30,.93)'; g.fillRect(X(-8), Y(0), 16 * S, 19 * S);
+  g.beginPath(); g.arc(X(0), Y(47), 6 * S, Math.PI, Math.PI * 2); g.fill();
+  g.save(); g.translate(X(0), Y(33.5)); g.font = `italic 900 ${4.4 * S}px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillStyle = 'rgba(255,255,255,.2)'; g.fillText('HOOPS 27', 0, 0);
+  g.font = `900 ${1.1 * S}px ${FONT}`; g.fillStyle = 'rgba(255,255,255,.16)'; g.fillText('街 頭 鬥 牛 · STREET LEAGUE', 0, 3 * S); g.restore();
+  const lw = .17 * S; g.strokeStyle = '#fbfbfb'; g.lineWidth = lw;
+  g.strokeRect(lw / 2, lw / 2, cw - lw, ch - lw);
+  g.strokeRect(X(-8), Y(0), 16 * S, 19 * S);
+  const arc = (x, y, r, a0, a1) => { g.beginPath(); g.arc(X(x), Y(y), r * S, a0, a1); g.stroke(); };
+  arc(0, 19, 6, 0, Math.PI * 2);
+  arc(0, 5.25, 4, 0, Math.PI);
+  arc(0, 47, 6, Math.PI, Math.PI * 2);
+  arc(0, 47, 2, Math.PI, Math.PI * 2);
+  for (const y of [7, 8, 11, 14]) { g.beginPath(); g.moveTo(X(-8), Y(y)); g.lineTo(X(-8.8), Y(y)); g.moveTo(X(8), Y(y)); g.lineTo(X(8.8), Y(y)); g.stroke(); }
+  const a0 = Math.asin(8.95 / 23.75);
+  g.beginPath(); g.moveTo(X(-22), Y(0)); g.lineTo(X(-22), Y(14.2)); g.arc(X(0), Y(5.25), 23.75 * S, Math.PI - a0, a0, true); g.lineTo(X(22), Y(0)); g.stroke();
+});
+const court = mesh(new THREE.PlaneGeometry(50, 47), std('#ffffff', .3, { map: courtTex, envMapIntensity: .55 }), scene, 0, 0, 23.5, false);
+court.rotation.x = -Math.PI / 2; court.receiveShadow = true;
+const apron = mesh(new THREE.PlaneGeometry(160, 130), std('#14213d', .45, { envMapIntensity: .4 }), scene, 0, -.02, 20, false);
+apron.rotation.x = -Math.PI / 2; apron.receiveShadow = true;
+
+// 看台與觀眾(InstancedMesh)
+const crowdData = [];
+function setCrowd(amp) {
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), s = new THREE.Vector3(1, 1, 1), v = new THREE.Vector3();
+  crowdData.forEach((c, i) => {
+    const b = amp ? Math.abs(Math.sin(G.t * 12 + c.ph)) * .5 * amp : 0;
+    q.setFromEuler(e.set(0, c.rotY, 0));
+    m.compose(v.set(c.pos.x, c.pos.y + .58 + b, c.pos.z), q, s); crowdData.bodies.setMatrixAt(i, m);
+    m.compose(v.set(c.pos.x, c.pos.y + 1.45 + b, c.pos.z), q, s); crowdData.heads.setMatrixAt(i, m);
+  });
+  crowdData.bodies.instanceMatrix.needsUpdate = true; crowdData.heads.instanceMatrix.needsUpdate = true;
+}
+(function buildArena() {
+  const standMat = std('#121827', .9);
+  const add = (pos, rotY) => crowdData.push({ pos, rotY, ph: Math.random() * 6 });
+  for (let r = 0; r < 14; r++) {
+    const top = (r + 1) * 1.15, z = -11 - r * 1.8;
+    mesh(new THREE.BoxGeometry(120, top, 1.8), standMat, scene, 0, top / 2, z, false);
+    for (let x = -58; x < 58; x += 1.05 + Math.random() * .25) if (Math.random() > .08) add({ x, y: top, z: z + .1 }, 0);
+    for (const s of [-1, 1]) {
+      const x = s * (33 + r * 1.8);
+      mesh(new THREE.BoxGeometry(1.8, top, 64), standMat, scene, x, top / 2, 22, false);
+      for (let zz = -9; zz < 53; zz += 1.05 + Math.random() * .25) if (Math.random() > .08) add({ x: x - s * .1, y: top, z: zz }, s > 0 ? -Math.PI / 2 : Math.PI / 2);
+    }
+  }
+  const PAL = ['#e8334a', '#1f6fff', '#ffd23f', '#f4f4f4', '#2bb673', '#ff7a1a', '#8e5cff', '#2a2a2a', '#555', '#a0c4ff', '#ff9ec7'];
+  const SK = ['#f1c9a5', '#c98d5d', '#8d5a3b', '#5c3a24', '#e0ac7e'];
+  const n = crowdData.length;
+  const bodies = new THREE.InstancedMesh(new THREE.BoxGeometry(.85, 1.15, .55), std('#6c6c72', .85), n);
+  const heads = new THREE.InstancedMesh(new THREE.SphereGeometry(.3, 10, 8), std('#8a8a8a', .75), n);
+  const col = new THREE.Color();
+  crowdData.forEach((c, i) => { bodies.setColorAt(i, col.set(pick(PAL))); heads.setColorAt(i, col.set(pick(SK))); });
+  scene.add(bodies, heads);
+  crowdData.bodies = bodies; crowdData.heads = heads;
+  setCrowd(0);
+  mesh(new THREE.BoxGeometry(200, 60, 1), std('#07090f', 1), scene, 0, 30, -38, false);
+  const lampMat = new THREE.MeshBasicMaterial({ color: '#fff6e0' });
+  for (let i = -3; i <= 3; i++) mesh(new THREE.BoxGeometry(5, .6, 2), lampMat, scene, i * 14, 52, 10, false);
+})();
+
+// LED 廣告帶
+const LED_TXT = 'HOOPS 27 · 街頭鬥牛 · STREET LEAGUE · ', LED_FONT = `italic 900 58px ${FONT}`;
+const LED_TW = (() => { const g = document.createElement('canvas').getContext('2d'); g.font = LED_FONT; return Math.ceil(g.measureText(LED_TXT).width); })();
+const ledTex = canvasTex(LED_TW * 2, 96, (g, w, h) => {
+  g.fillStyle = '#05070c'; g.fillRect(0, 0, w, h);
+  g.font = LED_FONT; g.textBaseline = 'middle'; g.fillStyle = '#ff7a1a';
+  for (let x = 0; x < w; x += LED_TW) g.fillText(LED_TXT, x, h / 2 + 2);
+});
+ledTex.wrapS = THREE.RepeatWrapping; ledTex.repeat.x = 110 * 96 / 2.6 / (LED_TW * 2);
+const ledMat = new THREE.MeshBasicMaterial({ map: ledTex, toneMapped: false });
+mesh(new THREE.PlaneGeometry(110, 2.6), ledMat, scene, 0, 1.3, -9.6, false);
+for (const s of [-1, 1]) { const m = mesh(new THREE.PlaneGeometry(64, 2.6), ledMat, scene, s * 31.6, 1.3, 22, false); m.rotation.y = -s * Math.PI / 2; }
+
+// 籃架
+const padMat = std('#1b2233', .7);
+mesh(new THREE.BoxGeometry(4.6, 3.4, 5), padMat, scene, 0, 1.7, -7.5);
+mesh(new THREE.BoxGeometry(4.65, .5, 5.05), std('#ff7a1a', .5), scene, 0, 3.1, -7.5);
+mesh(new THREE.CylinderGeometry(.38, .42, 9.4, 16), padMat, scene, 0, 8.1, -8.2);
+{
+  const a = new THREE.Vector3(0, 12.4, -8.2), b = new THREE.Vector3(0, 11.3, 3.8), len = a.distanceTo(b);
+  const arm = mesh(new THREE.BoxGeometry(.55, .55, len), padMat, scene); arm.position.copy(a).lerp(b, .5); arm.lookAt(b);
+}
+mesh(new THREE.BoxGeometry(6, 3.5, .08), new THREE.MeshPhysicalMaterial({ color: '#e6f3ff', roughness: .04, metalness: 0, transparent: true, opacity: .22, envMapIntensity: 2 }), scene, 0, 11.25, 4, false);
+const frameMat = std('#f4f6fa', .4, { emissive: '#000000' });
+for (const [w, h, x, y] of [[6.1, .12, 0, 13], [6.1, .12, 0, 9.5], [.12, 3.6, -3, 11.25], [.12, 3.6, 3, 11.25], [2, .09, 0, 11.5], [2, .09, 0, 10], [.09, 1.5, -1, 10.75], [.09, 1.5, 1, 10.75]])
+  mesh(new THREE.BoxGeometry(w, h, .1), frameMat, scene, x, y, 4.05);
+mesh(new THREE.BoxGeometry(6.3, .35, .4), padMat, scene, 0, 9.3, 4);
+const rimMat = std('#ff5a1f', .3, { metalness: .7 });
+const rim = mesh(new THREE.TorusGeometry(.75, .055, 12, 48), rimMat, scene, 0, 10, HOOP.y);
+rim.rotation.x = Math.PI / 2;
+mesh(new THREE.BoxGeometry(.3, .14, 1.0), rimMat, scene, 0, 9.96, 4.5);
+
+// 籃網(LineSegments,進球時會被拉長擺動)
+const NET_L = [[0, .75], [.38, .66], [.78, .57], [1.18, .5], [1.6, .45]], NN = 16;
+const netGeo = new THREE.BufferGeometry();
+const netPos = new Float32Array((NET_L.length - 1) * NN * 2 * 2 * 3);
+netGeo.setAttribute('position', new THREE.BufferAttribute(netPos, 3));
+scene.add(new THREE.LineSegments(netGeo, new THREE.LineBasicMaterial({ color: '#f2f4f8', transparent: true, opacity: .9 })));
+function netPoint(k, i, rimY) {
+  const [d, r] = NET_L[k], a = (i + (k % 2) * .5) / NN * Math.PI * 2, st = 1 + G.net * .8;
+  const sway = Math.sin(G.t * 28 + k) * G.net * .14 * k / 4;
+  return [HOOP.x + Math.cos(a) * r * (1 - G.net * .12 * k / 4) + sway, rimY - d * st, HOOP.y + Math.sin(a) * r];
+}
+function updNet(rimY) {
+  let o = 0;
+  const put = q => { netPos[o++] = q[0]; netPos[o++] = q[1]; netPos[o++] = q[2]; };
+  for (let k = 0; k < NET_L.length - 1; k++) for (let i = 0; i < NN; i++) {
+    const a = netPoint(k, i, rimY);
+    put(a); put(netPoint(k + 1, i, rimY));
+    put(a); put(netPoint(k + 1, k % 2 ? (i + 1) % NN : (i - 1 + NN) % NN, rimY));
+  }
+  netGeo.attributes.position.needsUpdate = true;
+}
+
+// 籃球
+const ballTex = canvasTex(1024, 512, (g, w, h) => {
+  g.fillStyle = '#d4631c'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 26000; i++) { g.fillStyle = Math.random() < .5 ? 'rgba(120,40,0,.35)' : 'rgba(255,170,100,.25)'; g.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
+  g.strokeStyle = '#1a0c05'; g.lineWidth = 9;
+  g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
+  for (const x of [w * .25, w * .75]) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); }
+  for (const sgn of [1, -1]) { g.beginPath(); for (let x = 0; x <= w; x += 8) { const y = h / 2 + sgn * h * .36 * Math.cos(x / w * Math.PI * 2); x ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); }
+});
+const ballMesh = mesh(new THREE.SphereGeometry(.39, 36, 24), std('#ffffff', .72, { map: ballTex }), scene);
+
+// 球員骨架(程式建模 + 程序動畫)
+function jerseyTex(col, num) {
+  return canvasTex(512, 512, (g, w, h) => {
+    g.fillStyle = col.jer; g.fillRect(0, 0, w, h);
+    const grd = g.createLinearGradient(0, 0, 0, h); grd.addColorStop(0, 'rgba(255,255,255,.08)'); grd.addColorStop(1, 'rgba(0,0,0,.18)');
+    g.fillStyle = grd; g.fillRect(0, 0, w, h);
+    g.fillStyle = col.trim; g.fillRect(0, 60, w, 16); g.fillRect(0, h - 70, w, 12);
+    for (const x of [w * .25, w * .75]) g.fillRect(x - 8, 60, 16, h);
+    g.font = `900 150px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 10; g.strokeStyle = col.trim;
+    for (const x of [0, w / 2, w]) { g.save(); g.translate(x, h * .5); g.scale(.8, 1); g.strokeText(num, 0, 0); g.fillStyle = col.num; g.fillText(num, 0, 0); g.restore(); }
+  });
+}
+const CAPS = (r, l) => new THREE.CapsuleGeometry(r, l, 6, 14);
+function makeRig(col, num) {
+  const skin = std(col.skin, .55), shorts = std(col.shorts, .7), shoe = std(col.shoe, .45), hair = std(col.hair, .9), trim = std(col.trim, .5);
+  const jer = std('#ffffff', .68, { map: jerseyTex(col, num) }), sock = std('#f2f2f2', .8);
+  const root = new THREE.Group(), hips = new THREE.Group(); hips.position.y = 3.2; root.add(hips);
+  mesh(new THREE.CylinderGeometry(.68, .78, 1.3, 22), shorts, hips, 0, -.38, 0).scale.z = .72;
+  mesh(new THREE.CylinderGeometry(.7, .7, .14, 22), trim, hips, 0, -1.0, 0).scale.z = .72;
+  const torso = new THREE.Group(); hips.add(torso);
+  mesh(CAPS(.58, 1.05), jer, torso, 0, 1.05, 0).scale.set(1, 1, .62);
+  mesh(new THREE.CylinderGeometry(.15, .17, .4, 12), skin, torso, 0, 2.05, 0);
+  const head = new THREE.Group(); head.position.y = 2.2; torso.add(head);
+  mesh(new THREE.SphereGeometry(.4, 24, 18), skin, head, 0, .38, 0).scale.set(.95, 1.08, 1);
+  mesh(new THREE.SphereGeometry(.42, 24, 12, 0, Math.PI * 2, 0, Math.PI * .46), hair, head, 0, .42, -.03);
+  mesh(new THREE.TorusGeometry(.39, .055, 8, 28), trim, head, 0, .56, 0).rotation.x = Math.PI / 2;
+  mesh(new THREE.SphereGeometry(.075, 8, 6), skin, head, 0, .34, .39);
+  for (const s of [-1, 1]) {
+    mesh(new THREE.SphereGeometry(.09, 8, 6), skin, head, s * .38, .36, 0);
+    mesh(new THREE.SphereGeometry(.045, 8, 6), std('#111', .3), head, s * .14, .45, .35);
+  }
+  const arm = {};
+  for (const [k, s] of [['L', 1], ['R', -1]]) {
+    const shd = new THREE.Group(); shd.position.set(s * .76, 1.78, 0); torso.add(shd);
+    mesh(new THREE.SphereGeometry(.24, 14, 10), skin, shd);
+    mesh(CAPS(.16, .72), skin, shd, 0, -.52, 0);
+    const el = new THREE.Group(); el.position.y = -1.05; shd.add(el);
+    mesh(CAPS(.135, .7), skin, el, 0, -.46, 0);
+    mesh(new THREE.SphereGeometry(.17, 12, 10), skin, el, 0, -.98, .02).scale.set(.85, 1.1, .7);
+    arm[k] = { sh: shd, el, s };
+  }
+  const leg = {};
+  for (const [k, s] of [['L', 1], ['R', -1]]) {
+    const hp = new THREE.Group(); hp.position.set(s * .34, -.05, 0); hips.add(hp);
+    mesh(CAPS(.25, 1.1), skin, hp, 0, -.8, 0);
+    const kn = new THREE.Group(); kn.position.y = -1.55; hp.add(kn);
+    mesh(CAPS(.2, 1.1), skin, kn, 0, -.7, 0);
+    mesh(new THREE.CylinderGeometry(.21, .2, .55, 12), sock, kn, 0, -1.2, 0);
+    const an = new THREE.Group(); an.position.y = -1.5; kn.add(an);
+    mesh(new THREE.BoxGeometry(.4, .3, .86), shoe, an, 0, -.02, .16);
+    mesh(new THREE.BoxGeometry(.42, .08, .9), std('#dddddd', .6), an, 0, -.15, .16);
+    leg[k] = { hp, kn, an, s };
+  }
+  const ring = new THREE.Mesh(new THREE.RingGeometry(1.35, 1.62, 48), new THREE.MeshBasicMaterial({ color: col.ring, transparent: true, opacity: .85, toneMapped: false }));
+  ring.rotation.x = -Math.PI / 2; scene.add(ring);
+  scene.add(root);
+  return { root, hips, torso, head, arm, leg, ring, pose: null };
+}
+const rigs = [makeRig(COLS[0], 7), makeRig(COLS[1], 11)];
+
+function targetPose(p) {
+  const o = other(p), sp = hyp(p.vx, p.vy), onG = p.z < .02;
+  const f = fwdOf(p), r = rightOf(p);
+  const vf = p.vx * f.x + p.vy * f.y, vs = p.vx * r.x + p.vy * r.y;
+  const ra = onG ? Math.min(1, sp / 13) : 0, fk = sp > .5 ? vf / sp : 0, sk = sp > .5 ? vs / sp : 0;
+  const s1 = Math.sin(p.anim), c1 = Math.cos(p.anim), sw = s1 * .8 * ra;
+  const T = {
+    hy: -Math.abs(s1) * .12 * ra, tx: .08 + .25 * ra * Math.max(0, fk), tz: 0, hx: 0,
+    L: { x: sw * .8 * fk + .05, z: .14, e: -.35 - .3 * ra }, R: { x: -sw * .8 * fk + .05, z: .14, e: -.35 - .3 * ra },
+    lL: { x: -sw * fk - .05, z: .06 + Math.max(0, s1) * .35 * Math.abs(sk) * ra, k: .15 + Math.max(0, -c1) * 1.1 * ra },
+    lR: { x: sw * fk - .05, z: .06 + Math.max(0, -s1) * .35 * Math.abs(sk) * ra, k: .15 + Math.max(0, c1) * 1.1 * ra },
+  };
+  const oppHas = ball.state === 'held' && ball.owner === o, hasBall = ball.state === 'held' && ball.owner === p;
+  const crouch = d => { T.hy -= d; T.lL.x -= d * .9; T.lR.x -= d * .9; T.lL.k += d * 1.8; T.lR.k += d * 1.8; T.tx += d * .5; };
+  if (p.stun > 0) {
+    crouch(.45); T.tz = Math.sin(G.t * 14) * .3 * p.side; T.tx = -.25;
+    T.L = { x: -.6, z: 1.3, e: -.2 }; T.R = { x: -.9, z: 1.1, e: -.4 }; T.lL.x = -.8;
+  } else if (p.dunkHang > 0) {
+    T.L = { x: -2.95, z: .2, e: -.1 }; T.R = { x: -2.95, z: .2, e: -.1 }; T.lL = { x: -.5, z: .1, k: .7 }; T.lR = { x: .2, z: .1, k: .4 }; T.tx = -.15; T.hx = -.3;
+  } else if (p.shot) {
+    const s = p.shot;
+    if (s.type === 'jumper') {
+      if (!s.rel) { const k = Math.min(1, s.t / .22); T.L = { x: -.4 - 2.3 * k, z: .3, e: -.4 - 1.3 * k }; T.R = { x: -.4 - 2.4 * k, z: .25, e: -.4 - 1.25 * k }; }
+      else { T.R = { x: -2.95, z: .12, e: -.05 }; T.L = { x: -2.4, z: .45, e: -.6 }; }
+      T.lL = { x: -.15, z: .06, k: onG ? .7 : .25 }; T.lR = { x: -.15, z: .06, k: onG ? .7 : .25 }; T.tx = 0; T.hx = -.25; T.hy = onG ? -.3 : 0;
+    } else {
+      T.R = { x: -3.0, z: .1, e: -.1 }; T.L = { x: s.type === 'dunk' ? -2.8 : -1.3, z: .3, e: -.4 };
+      T.lL = { x: -1.3, z: .05, k: 1.7 }; T.lR = { x: .25, z: .05, k: .25 }; T.tx = -.05; T.hx = -.3;
+    }
+  } else if (!onG) {
+    T.L = { x: -2.9, z: .25, e: -.1 }; T.R = { x: -2.9, z: .25, e: -.1 }; T.lL = { x: -.35, z: .08, k: .7 }; T.lR = { x: -.2, z: .08, k: .5 }; T.hx = -.3;
+  } else if (G.state === 'check' && hasBall) {
+    T.L = { x: -.95, z: .28, e: -1.25 }; T.R = { x: -.95, z: .28, e: -1.25 };
+  } else if (hasBall) {
+    const bs = Math.abs(Math.sin(ball.ph)), hand = p.side > 0 ? 'R' : 'L', off = p.side > 0 ? 'L' : 'R';
+    T[hand] = { x: -.45 - (1 - bs) * .25, z: .42, e: -.3 - bs * .6 };
+    T[off] = { x: -.95, z: .5, e: -1.15 };
+    crouch(.25); T.tx += .15;
+  } else if (p.reach > 0) {
+    T.R = { x: -1.55, z: .15, e: -.1 }; T.L = { x: .15, z: .5, e: -.5 }; crouch(.3); T.tx += .3;
+  } else if (oppHas && G.state === 'play') {
+    const w = Math.sin(G.t * 7) * .18; crouch(.5); T.lL.z += .28; T.lR.z += .28;
+    T.L = { x: -.55 + w, z: 1.15, e: -.5 }; T.R = { x: -.55 - w, z: 1.15, e: -.5 };
+  }
+  return T;
+}
+function lerpPose(cur, T, k) {
+  if (!cur) return JSON.parse(JSON.stringify(T));
+  const go = (a, b) => { for (const key in b) { if (typeof b[key] === 'object') go(a[key], b[key]); else a[key] += (b[key] - a[key]) * k; } };
+  go(cur, T); return cur;
+}
+function poseRig(p, dt) {
+  const R = rigs[p.team];
+  R.pose = lerpPose(R.pose, targetPose(p), Math.min(1, dt * 16));
+  const T = R.pose;
+  R.root.position.set(p.x, p.z, p.y); R.root.rotation.y = p.face;
+  R.hips.position.y = 3.2 + T.hy;
+  R.torso.rotation.set(T.tx, 0, T.tz); R.head.rotation.x = T.hx - T.tx * .5;
+  for (const k of ['L', 'R']) {
+    const a = R.arm[k], t = T[k]; a.sh.rotation.set(t.x, 0, a.s * t.z); a.el.rotation.x = t.e;
+    const l = R.leg[k], u = T['l' + k]; l.hp.rotation.set(u.x, 0, l.s * u.z); l.kn.rotation.x = u.k; l.an.rotation.x = -(u.x + u.k) * .6;
+  }
+  R.ring.position.set(p.x, .03, p.y);
+  R.ring.material.opacity = p.isAI ? .45 : .9;
+}
+
+// 攝影機(轉播視角，跟著球走)
+const camPos = new THREE.Vector3(0, 30, 70), camLook = new THREE.Vector3(0, 6, 14), tp = new THREE.Vector3(), tl = new THREE.Vector3();
+function updCamera(dt) {
+  if (G.state === 'menu') {
+    const a = G.t * .12; tp.set(Math.sin(a) * 44, 15, 24 + Math.cos(a) * 38); tl.set(0, 5, 16);
+  } else {
+    const bx = clamp(ball.x, -25, 25), by = clamp(ball.y, 0, 44);
+    tp.set(bx * .5, 19 + by * .06, 50 + by * .2); tl.set(bx * .55, 6, 3 + by * .55);
+  }
+  camPos.lerp(tp, Math.min(1, dt * 2.2)); camLook.lerp(tl, Math.min(1, dt * 3));
+  camera.position.copy(camPos);
+  if (G.rimShake > .25) camera.position.add(new THREE.Vector3(rnd(-1, 1), rnd(-1, 1), 0).multiplyScalar(G.rimShake * .35));
+  camera.lookAt(camLook);
+}
+
+let crowdWas = 0;
+function sync3D(dt) {
+  for (const p of G.players) poseRig(p, dt);
+  ballMesh.position.set(ball.x, ball.z, ball.y);
+  if (ball.state === 'flight') ballMesh.rotation.x -= dt * 14;
+  else if (ball.state === 'held') ballMesh.rotation.x += dt * 9;
+  else ballMesh.rotation.x += dt * hyp(ball.vx, ball.vy) * 2.5;
+  const rimY = 10 + Math.sin(G.t * 70) * G.rimShake * .15;
+  rim.position.y = rimY; updNet(rimY);
+  frameMat.emissive.set(G.board > 0 ? '#ff6a00' : '#000000'); frameMat.emissiveIntensity = G.board * 2.5;
+  ledTex.offset.x = (G.t * .03) % 1;
+  ledMat.color.set(G.board > 0 ? '#ffe08a' : '#ffffff');
+  if (G.crowd > 0 || crowdWas > 0) setCrowd(Math.min(1, G.crowd));
+  crowdWas = G.crowd;
+  updCamera(dt);
+}
+
+// ================= HUD(2D 疊層) =================
+const _v = new THREE.Vector3();
+function scr(x, y, z) { _v.set(x, z, y).project(camera); return { x: (_v.x + 1) / 2 * W, y: (1 - _v.y) / 2 * H }; }
 function rrect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
 
-const WALL_Y = P(0, -8, 0).y;
-const bgCanvas = document.createElement('canvas'); bgCanvas.width = W; bgCanvas.height = H;
-const crowd = [];
-(function buildBackground() {
-  const PAL = ['#e8334a', '#1f6fff', '#ffd23f', '#f4f4f4', '#2bb673', '#ff7a1a', '#8e5cff', '#222', '#555', '#a0c4ff'];
-  const SK = ['#f1c9a5', '#c98d5d', '#8d5a3b', '#5c3a24', '#e0ac7e'];
-  const rows = Math.floor((WALL_Y - 40 - 52) / 19);
-  for (let r = 0; r < rows; r++) {
-    const yy = 52 + r * 19, sc = .66 + r * .04;
-    for (let x = -8; x < W + 10; x += 15 * sc + Math.random() * 5) crowd.push({ x, y: yy, sc, c: pick(PAL), sk: pick(SK), ph: Math.random() * 6 });
+function drawPlayerMarks() {
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const p of G.players) {
+    const h = scr(p.x, p.y, p.z + 7.4);
+    ctx.fillStyle = p.isAI ? '#ff6b7d' : '#ffd23f';
+    ctx.beginPath(); ctx.moveTo(h.x - 8, h.y - 12); ctx.lineTo(h.x + 8, h.y - 12); ctx.lineTo(h.x, h.y - 2); ctx.fill();
+    ctx.font = `800 14px ${FONT}`; ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.6)';
+    const lab = p.isAI ? 'CPU' : 'P1'; ctx.strokeText(lab, h.x, h.y - 22); ctx.fillText(lab, h.x, h.y - 22);
+    if (p.pop) {
+      const a = 1 - Math.max(0, p.pop.t - .7) / .4, rise = p.pop.t * 26;
+      ctx.globalAlpha = clamp(a, 0, 1); ctx.font = `900 24px ${FONT}`; ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(0,0,0,.7)';
+      ctx.strokeText(p.pop.text, h.x, h.y - 46 - rise); ctx.fillStyle = p.pop.color; ctx.fillText(p.pop.text, h.x, h.y - 46 - rise);
+      ctx.globalAlpha = 1;
+    }
+    if (!p.isAI) { const m = scr(p.x, p.y, p.z + 4.2); drawMeter(p, m.x + 48, m.y); }
   }
-  const b = bgCanvas.getContext('2d');
-  const g = b.createLinearGradient(0, 0, 0, WALL_Y);
-  g.addColorStop(0, '#05070d'); g.addColorStop(1, '#161b2b');
-  b.fillStyle = g; b.fillRect(0, 0, W, H);
-  drawCourtOn(b);
-})();
-function drawCourtOn(c) {
-  const draw = (pts, fill, stroke, lw) => {
-    c.beginPath();
-    pts.forEach((q, i) => { const s = P(q[0], q[1], q[2] || 0); i ? c.lineTo(s.x, s.y) : c.moveTo(s.x, s.y); });
-    if (fill) { c.fillStyle = fill; c.fill(); }
-    if (stroke) { c.strokeStyle = stroke; c.lineWidth = lw; c.stroke(); }
-  };
-  draw([[-60, -8], [60, -8], [60, 49], [-60, 49]], '#16233f');
-  const top = P(0, 0).y, bot = P(0, 47).y;
-  const wood = c.createLinearGradient(0, top, 0, bot);
-  wood.addColorStop(0, '#b97a45'); wood.addColorStop(1, '#e3a86c');
-  draw([[-25, 0], [25, 0], [25, 47], [-25, 47]], wood);
-  c.globalAlpha = .08;
-  for (let x = -25; x <= 25; x += 1.25) draw([[x, 0], [x, 47]], null, '#3a1f0a', 1);
-  c.globalAlpha = 1;
-  draw([[-8, 0], [8, 0], [8, 19], [-8, 19]], 'rgba(200,62,40,.88)');
-  draw(arcPts(0, 36.5, 7, 0, Math.PI * 2, 48).map(q => [q[0], 36.5 + (q[1] - 36.5) * .6]), 'rgba(255,255,255,.07)', 'rgba(255,255,255,.35)', 2);
-  const lp = P(0, 36.5);
-  c.save(); c.translate(lp.x, lp.y); c.scale(1, .45);
-  c.font = `italic 900 ${3.2 * lp.s}px ${FONT}`; c.textAlign = 'center'; c.textBaseline = 'middle';
-  c.fillStyle = 'rgba(255,255,255,.28)'; c.fillText('HOOPS 27', 0, 0); c.restore();
-  const L = 'rgba(255,255,255,.92)', lw = 3;
-  draw([[-25, 47], [-25, 0], [25, 0], [25, 47]], null, L, lw);
-  draw([[-25, 47], [25, 47]], null, L, lw);
-  draw([[-8, 0], [-8, 19], [8, 19], [8, 0]], null, L, lw);
-  draw(arcPts(0, 19, 6, 0, Math.PI * 2, 48), null, L, lw);
-  draw(arcPts(0, 5.25, 4, 0, Math.PI, 24), null, L, lw);
-  draw(arcPts(0, 47, 6, Math.PI, Math.PI * 2, 32), null, L, lw);
-  for (const y of [7, 8, 11, 14]) for (const sx of [-1, 1]) draw([[sx * 8, y], [sx * 8.8, y]], null, L, lw);
-  const a0 = Math.asin(8.95 / 23.75);
-  draw([[-22, 0], [-22, 14.2], ...arcPts(0, 5.25, 23.75, Math.PI - a0, a0, 60), [22, 14.2], [22, 0]], null, L, lw);
-}
-
-function drawArena() {
-  ctx.drawImage(bgCanvas, 0, 0);
-  // 觀眾(歡呼時會跳動)
-  const bob = Math.min(1, G.crowd);
-  for (const q of crowd) {
-    const y = q.y - (bob ? Math.abs(Math.sin(G.t * 13 + q.ph)) * 5 * q.sc * bob : 0);
-    ctx.fillStyle = q.c; rrect(q.x - 6 * q.sc, y - 4 * q.sc, 12 * q.sc, 16 * q.sc, 4 * q.sc); ctx.fill();
-    ctx.fillStyle = q.sk; ctx.beginPath(); ctx.arc(q.x, y - 8 * q.sc, 4.6 * q.sc, 0, 7); ctx.fill();
-  }
-  const sh = ctx.createLinearGradient(0, 40, 0, WALL_Y);
-  sh.addColorStop(0, 'rgba(5,7,13,.75)'); sh.addColorStop(1, 'rgba(5,7,13,.25)');
-  ctx.fillStyle = sh; ctx.fillRect(0, 0, W, WALL_Y);
-  // 燈光
-  for (const lx of [W * .18, W * .5, W * .82]) {
-    const g = ctx.createRadialGradient(lx, 0, 0, lx, 0, 260);
-    g.addColorStop(0, 'rgba(255,240,210,.22)'); g.addColorStop(1, 'rgba(255,240,210,0)');
-    ctx.fillStyle = g; ctx.fillRect(lx - 260, 0, 520, 260);
-  }
-  // LED 廣告帶
-  ctx.fillStyle = '#0a0d16'; ctx.fillRect(0, WALL_Y - 30, W, 30);
-  ctx.save(); ctx.beginPath(); ctx.rect(0, WALL_Y - 30, W, 30); ctx.clip();
-  ctx.font = `italic 900 19px ${FONT}`; ctx.textBaseline = 'middle';
-  const txt = 'HOOPS 27 · 街頭鬥牛 · STREET LEAGUE · ', tw = ctx.measureText(txt).width, off = (G.t * 90) % tw;
-  ctx.fillStyle = G.board > 0 ? '#ffd23f' : '#ff7a1a';
-  for (let x = -off; x < W; x += tw) ctx.fillText(txt, x, WALL_Y - 15);
-  ctx.restore();
-}
-
-function drawHoopBack() {
-  const shake = Math.sin(G.t * 70) * G.rimShake * .18;
-  // 籃架
-  const base = P(0, -5.5, 0), top = P(0, -5.5, 12.2);
-  ctx.fillStyle = '#1b2233'; const bw = 2.6 * base.s; rrect(base.x - bw, base.y - 3.2 * base.s, bw * 2, 3.4 * base.s, 6); ctx.fill();
-  ctx.strokeStyle = '#2a3348'; ctx.lineCap = 'round';
-  ctx.lineWidth = .7 * base.s; ctx.beginPath(); ctx.moveTo(base.x, base.y - 2 * base.s); ctx.lineTo(top.x, top.y); ctx.stroke();
-  const arm = P(0, 4, 11.4);
-  ctx.lineWidth = .45 * arm.s; ctx.beginPath(); ctx.moveTo(top.x, top.y); ctx.lineTo(arm.x, arm.y); ctx.stroke();
-  // 籃板
-  poly3([[-3, 4, 9.5], [3, 4, 9.5], [3, 4, 13], [-3, 4, 13]], 'rgba(210,230,255,.2)', G.board > 0 ? `rgba(255,${120 + 100 * (1 - G.board)},40,1)` : '#f2f5fa', G.board > 0 ? 5 : 3);
-  poly3([[-1, 4, 10], [1, 4, 10], [1, 4, 11.5], [-1, 4, 11.5], [-1, 4, 10]], null, '#f2f5fa', 2.5);
-  poly3([[0, 4, 10 + shake], [0, 4.5, 10 + shake]], null, '#ff5a1f', 4);
-  drawRimHalf(true);
-}
-function rimPt(a, r, z) { return [HOOP.x + Math.cos(a) * r, HOOP.y + Math.sin(a) * r, z]; }
-function drawRimHalf(back) {
-  const shake = Math.sin(G.t * 70) * G.rimShake * .18, rz = HOOP.z + shake;
-  const a0 = back ? Math.PI : 0, a1 = back ? Math.PI * 2 : Math.PI;
-  const drop = G.net * 1.2, bz = 8.2 - drop, sway = Math.sin(G.t * 30) * G.net * .15;
-  ctx.globalAlpha = back ? .55 : .9;
-  for (let i = 0; i <= 8; i++) {
-    const a = a0 + (a1 - a0) * i / 8;
-    poly3([rimPt(a, .75, rz), rimPt(a + .35, .6, (rz + bz) / 2), rimPt(a, .42 + sway, bz)], null, '#f4f6fa', 1.4);
-    poly3([rimPt(a, .75, rz), rimPt(a - .35, .6, (rz + bz) / 2), rimPt(a, .42 + sway, bz)], null, '#f4f6fa', 1.4);
-  }
-  poly3(arcPts(HOOP.x, HOOP.y, .6, a0, a1, 12, (rz + bz) / 2), null, '#f4f6fa', 1.2);
-  ctx.globalAlpha = 1;
-  poly3(arcPts(HOOP.x, HOOP.y, .75, a0, a1, 18, rz), null, '#ff5a1f', 4);
-}
-
-function limb(pts, w, c) {
-  ctx.strokeStyle = c; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]); ctx.stroke();
-}
-function drawShadow(x, y, z, rx) {
-  const g = P(x, y, 0), k = Math.max(.35, 1 - z / 14);
-  ctx.fillStyle = `rgba(0,0,0,${.35 * k})`; ctx.beginPath(); ctx.ellipse(g.x, g.y, rx * g.s * k, rx * .34 * g.s * k, 0, 0, 7); ctx.fill();
-}
-
-function drawPlayer(p) {
-  const b = P(p.x, p.y, p.z), s = b.s, c = p.col, X = b.x, Y = b.y;
-  const onGround = p.z < .02, spd = hyp(p.vx, p.vy);
-  const run = onGround && spd > 1.5 ? Math.sin(p.anim) : 0, ra = onGround ? Math.min(1, spd / 12) : 0;
-  const oppHas = ball.state === 'held' && ball.owner && ball.owner.team !== p.team;
-  const stance = oppHas && !p.shot && onGround && G.state === 'play';
-  const hip = (stance ? 2.75 : 3.1) * s, sh = hip + 2.05 * s, L = .36 * s;
-  ctx.save(); ctx.translate(X, Y);
-  if (p.stun > 0) ctx.rotate((Math.sin(G.t * 20) * .1 + .3) * p.side * Math.min(1, p.stun * 2));
-  // 腿
-  const spread = (stance ? .95 : .42) * s, tuck = onGround ? 0 : .7 * s;
-  const f1 = -spread + run * ra * .7 * s, f2 = spread - run * ra * .7 * s, kn = stance ? .25 * s : 0;
-  limb([-.32 * s, -hip, -.45 * s + f1 * .4, -hip * .5 - tuck * .4 - kn, f1, -tuck], L, c.skin);
-  limb([.32 * s, -hip, .45 * s + f2 * .4, -hip * .5 - tuck * .4 - kn, f2, -tuck], L, c.skin);
-  ctx.fillStyle = c.shoe;
-  for (const fx of [f1, f2]) { ctx.beginPath(); ctx.ellipse(fx, -tuck, .36 * s, .19 * s, 0, 0, 7); ctx.fill(); }
-  // 球褲 / 球衣
-  ctx.fillStyle = c.shorts; rrect(-.8 * s, -hip - .35 * s, 1.6 * s, 1.3 * s, .22 * s); ctx.fill();
-  ctx.fillStyle = c.jer; rrect(-.74 * s, -sh - .15 * s, 1.48 * s, sh - hip + .5 * s, .36 * s); ctx.fill();
-  ctx.strokeStyle = c.trim; ctx.lineWidth = Math.max(1.5, .09 * s); ctx.stroke();
-  ctx.fillStyle = c.num; ctx.font = `900 ${.95 * s}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(p.num, 0, -hip - 1.05 * s);
-  // 手臂
-  const shY = -sh + .15 * s, shX = .64 * s;
-  let hl, hr;
-  const up = -(sh + 1.9 * s);
-  if (p.dunkHang > 0) { hl = [-.35 * s, up]; hr = [.35 * s, up]; }
-  else if (p.shot && !p.shot.rel) { hl = [p.side * .05 * s - .3 * s, -(sh + 1.5 * s)]; hr = [p.side * .05 * s + .3 * s, -(sh + 1.5 * s)]; }
-  else if (p.shot) { const a = [p.side * .3 * s, -(sh + 2 * s)], b2 = [-p.side * .5 * s, -(sh + .9 * s)]; if (p.side > 0) { hr = a; hl = b2; } else { hl = a; hr = b2; } }
-  else if (ball.state === 'held' && ball.owner === p && G.state === 'play') {
-    const bp = P(ball.x, ball.y, ball.z + .4), hand = [bp.x - X, bp.y - Y], off = [-p.side * 1.05 * s, -hip - .5 * s];
-    if (p.side > 0) { hr = hand; hl = off; } else { hl = hand; hr = off; }
-  } else if (ball.state === 'held' && ball.owner === p) { hl = [-.2 * s, -hip - .4 * s]; hr = [.9 * s, -hip - .3 * s]; }
-  else if (p.reach > 0) { const o = other(p), d = Math.sign(o.x - p.x) || 1; const a = [d * 1.9 * s, -hip - .5 * s], b2 = [-d * .8 * s, -hip]; if (d > 0) { hr = a; hl = b2; } else { hl = a; hr = b2; } }
-  else if (!onGround) { hl = [-.5 * s, up]; hr = [.5 * s, up]; }
-  else if (stance) { const w = Math.sin(G.t * 8) * .15 * s; hl = [-1.75 * s, -hip - 1.3 * s + w]; hr = [1.75 * s, -hip - 1.3 * s - w]; }
-  else { hl = [-.85 * s - run * .25 * s, -hip - .05 * s]; hr = [.85 * s + run * .25 * s, -hip - .05 * s]; }
-  for (const [sx, h] of [[-shX, hl], [shX, hr]]) {
-    const ex = (sx + h[0]) / 2 + Math.sign(sx) * .28 * s, ey = (shY + h[1]) / 2 + .1 * s;
-    limb([sx, shY, ex, ey, h[0], h[1]], L * .9, c.skin);
-  }
-  // 頭
-  ctx.fillStyle = c.skin; ctx.fillRect(-.16 * s, -sh - .45 * s, .32 * s, .4 * s);
-  const hy = -sh - .72 * s;
-  ctx.beginPath(); ctx.arc(0, hy, .46 * s, 0, 7); ctx.fill();
-  ctx.fillStyle = c.hair; ctx.beginPath(); ctx.arc(0, hy - .05 * s, .47 * s, Math.PI * 1.05, Math.PI * 1.95); ctx.fill();
-  ctx.strokeStyle = c.trim; ctx.lineWidth = .1 * s; ctx.beginPath(); ctx.moveTo(-.45 * s, hy - .12 * s); ctx.lineTo(.45 * s, hy - .12 * s); ctx.stroke();
-  if (p.stun > 0) {
-    ctx.fillStyle = '#ffd23f'; ctx.font = `${.5 * s}px ${FONT}`;
-    for (let i = 0; i < 3; i++) { const a = G.t * 6 + i * 2.1; ctx.fillText('✦', Math.cos(a) * .7 * s, hy - .7 * s + Math.sin(a) * .2 * s); }
-  }
-  ctx.restore();
-  // 頭上標記
-  const my = Y - sh - 2.1 * s;
-  ctx.fillStyle = p.isAI ? '#ff6b7d' : '#ffd23f';
-  ctx.beginPath(); ctx.moveTo(X - 8, my - 12); ctx.lineTo(X + 8, my - 12); ctx.lineTo(X, my - 2); ctx.fill();
-  ctx.font = `800 14px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(p.isAI ? 'CPU' : 'P1', X, my - 22);
-  if (p.pop) {
-    const a = 1 - Math.max(0, p.pop.t - .7) / .4, rise = p.pop.t * 26;
-    ctx.globalAlpha = clamp(a, 0, 1); ctx.font = `900 24px ${FONT}`; ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(0,0,0,.7)';
-    ctx.strokeText(p.pop.text, X, my - 44 - rise); ctx.fillStyle = p.pop.color; ctx.fillText(p.pop.text, X, my - 44 - rise);
-    ctx.globalAlpha = 1;
-  }
-  if (!p.isAI) drawMeter(p, X + 1.6 * s, Y - sh - .5 * s);
 }
 
 function drawMeter(p, x, y) {
@@ -854,19 +1043,6 @@ function drawMeter(p, x, y) {
   ctx.fillRect(x - 4, yv(v) - 2, w + 8, 4);
 }
 
-function drawBall() {
-  if (ball.state === 'held' && !ball.owner) return;
-  const b = P(ball.x, ball.y, ball.z), r = Math.max(3, .42 * b.s);
-  const g = ctx.createRadialGradient(b.x - r * .35, b.y - r * .35, r * .1, b.x, b.y, r);
-  g.addColorStop(0, '#ffb066'); g.addColorStop(1, '#c94f10');
-  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, 7); ctx.fill();
-  ctx.strokeStyle = 'rgba(30,10,0,.8)'; ctx.lineWidth = Math.max(1, r * .1);
-  const rot = G.t * 6;
-  ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, 7); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(b.x + Math.cos(rot) * r, b.y + Math.sin(rot) * r); ctx.lineTo(b.x - Math.cos(rot) * r, b.y - Math.sin(rot) * r); ctx.stroke();
-  ctx.beginPath(); ctx.ellipse(b.x, b.y, r * .45, r, rot, 0, 7); ctx.stroke();
-}
-
 function drawHUD() {
   const u = user(), c = cpu(), cx = W / 2, y = 12;
   ctx.fillStyle = 'rgba(8,11,20,.85)'; rrect(cx - 310, y, 620, 70, 14); ctx.fill();
@@ -880,26 +1056,24 @@ function drawHUD() {
   ctx.font = `900 40px ${FONT}`; ctx.fillStyle = '#fff';
   ctx.textAlign = 'right'; ctx.fillText(G.score[0], cx - 70, y + 42);
   ctx.textAlign = 'left'; ctx.fillText(G.score[1], cx + 70, y + 42);
-  // 球權
   ctx.fillStyle = '#ff7a1a'; ctx.beginPath(); ctx.arc(G.offense === 0 ? cx - 280 : cx + 280, y + 50, 7, 0, 7); ctx.fill();
-  // 進攻時間
   ctx.fillStyle = '#000'; rrect(cx - 42, y + 12, 84, 46, 8); ctx.fill();
   const sc = Math.max(0, G.shotClock);
   ctx.font = `900 30px ${FONT}`; ctx.textAlign = 'center'; ctx.fillStyle = sc < 5 ? '#ff4d4d' : '#ffd23f';
   ctx.fillText(sc < 5 ? sc.toFixed(1) : Math.ceil(sc), cx, y + 36);
-  ctx.font = `600 12px ${FONT}`; ctx.fillStyle = '#9aa3b5';
-  ctx.fillText(`搶 ${G.target} 分 · ${G.diff.nm}`, cx, y + 86);
-  // 體力
+  ctx.font = `600 12px ${FONT}`; ctx.fillStyle = '#c3cad8';
+  ctx.fillText(`搶 ${G.target} 分 · ${G.diff.nm}`, cx, y + 90);
   const bx = 24, by = H - 34;
   ctx.fillStyle = 'rgba(8,11,20,.75)'; rrect(bx - 8, by - 20, 250, 38, 10); ctx.fill();
   ctx.font = `700 13px ${FONT}`; ctx.textAlign = 'left'; ctx.fillStyle = '#cfd6e6'; ctx.fillText('體力', bx, by);
   ctx.fillStyle = '#252c3d'; rrect(bx + 40, by - 5, 190, 10, 5); ctx.fill();
   ctx.fillStyle = u.stam > 30 ? '#3dd68c' : '#ff6b6b'; rrect(bx + 40, by - 5, 190 * u.stam / 100, 10, 5); ctx.fill();
+  ctx.textAlign = 'center';
   if (G.needsClear[0] && ball.owner === u) {
-    ctx.font = `800 15px ${FONT}`; ctx.fillStyle = '#ffd23f'; ctx.textAlign = 'center';
+    ctx.font = `800 15px ${FONT}`; ctx.fillStyle = '#ffd23f';
     ctx.fillText('⚠ 需清球：把球帶出三分線', W / 2, H - 22);
   } else if (!IS_TOUCH && G.t < 25) {
-    ctx.font = `500 13px ${FONT}`; ctx.fillStyle = 'rgba(207,214,230,.6)'; ctx.textAlign = 'center';
+    ctx.font = `500 13px ${FONT}`; ctx.fillStyle = 'rgba(230,235,245,.75)';
     ctx.fillText('WASD 移動 · Shift 衝刺 · 空白鍵 按住起跳/最高點放開出手 · E 花式運球/抄截 · P 暫停', W / 2, H - 20);
   }
 }
@@ -908,7 +1082,7 @@ function drawMsgs() {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   G.msgs.forEach((m, i) => {
     const a = m.t < .12 ? m.t / .12 : 1 - Math.max(0, m.t - (m.dur - .35)) / .35;
-    const sc = m.big ? 1 + Math.max(0, .15 - m.t) * 2.5 : 1, y = 160 + i * 52;
+    const sc = m.big ? 1 + Math.max(0, .15 - m.t) * 2.5 : 1, y = 170 + i * 52;
     ctx.save(); ctx.globalAlpha = clamp(a, 0, 1); ctx.translate(W / 2, y); ctx.scale(sc, sc);
     ctx.font = `italic 900 ${m.big ? 44 : 26}px ${FONT}`;
     ctx.lineWidth = 7; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(m.text, 0, 0);
@@ -922,21 +1096,17 @@ function drawMsgs() {
   }
 }
 
-function render() {
-  drawArena();
-  if (!G.players.length) return;
-  drawHoopBack();
-  for (const p of G.players) drawShadow(p.x, p.y, p.z, 1.25);
-  if (!(ball.state === 'held' && G.state === 'menu')) drawShadow(ball.x, ball.y, ball.z, .45);
-  const items = G.players.map(p => ({ y: p.y, f: () => drawPlayer(p) }));
-  items.push({ y: ball.state === 'held' && ball.owner ? ball.owner.y + .36 : ball.y, f: drawBall });
-  items.push({ y: HOOP.y + .01, f: () => drawRimHalf(false) });
-  items.sort((a, b) => a.y - b.y).forEach(i => i.f());
-  if (G.state !== 'menu') { drawHUD(); drawMsgs(); }
+function render(dt) {
+  sync3D(dt);
+  renderer.render(scene, camera);
+  ctx.clearRect(0, 0, W, H);
+  if (G.state !== 'menu') { drawPlayerMarks(); drawHUD(); drawMsgs(); }
 }
 
+function fit() { const s = $('stage'); renderer.setSize(s.clientWidth, s.clientHeight, false); }
+addEventListener('resize', fit); fit();
+
 // ================= 流程 / 選單 =================
-const $ = id => document.getElementById(id);
 function show(id, on) { $(id).classList.toggle('hidden', !on); }
 function setPlayingUI(on) { show('touch', on && IS_TOUCH); show('topbtns', on); }
 
@@ -968,7 +1138,13 @@ function togglePause() {
   if (G.state === 'play' || G.state === 'check') { pausedFrom = G.state; G.state = 'paused'; show('pauseMenu', true); }
   else if (G.state === 'paused') { G.state = pausedFrom; show('pauseMenu', false); last = performance.now(); }
 }
-function toMenu() { G.state = 'menu'; show('over', false); show('pauseMenu', false); show('menu', true); setPlayingUI(false); }
+function setupDemo() {
+  G.players = [mkPlayer(0, ARCHS[0], false), mkPlayer(1, ARCHS[1], true)];
+  Object.assign(G.players[0], { x: -3, y: 22, face: Math.atan2(3, -17) });
+  Object.assign(G.players[1], { x: 3, y: 14, face: Math.atan2(-6, 8) });
+  ball.state = 'held'; ball.owner = G.players[0];
+}
+function toMenu() { G.state = 'menu'; setupDemo(); show('over', false); show('pauseMenu', false); show('menu', true); setPlayingUI(false); }
 
 (function buildMenu() {
   const cards = $('cards');
@@ -990,7 +1166,7 @@ function toMenu() { G.state = 'menu'; show('over', false); show('pauseMenu', fal
   seg('segDiff', Object.entries(DIFFS).map(([k, d]) => [k, d.nm]), () => G.diffKey, v => G.diffKey = v);
   seg('segTarget', [[11, '11 分'], [15, '15 分'], [21, '21 分']], () => G.target, v => G.target = v);
   if (IS_TOUCH) $('helpKeys').innerHTML = '左下搖桿移動 · 「投籃」按住起跳、<b>最高點放開</b>出手(綠區=完美)<br>「花式/抄截」進攻晃人、防守抄截 · 防守時按「投籃」跳起封阻 · 按住「衝刺」加速';
-  $('btnStart').onclick = startGame;
+  $('btnStart').onclick = startGame; $('btnStart').disabled = false; $('btnStart').textContent = '開始比賽';
   $('btnAgain').onclick = startGame;
   $('btnMenu').onclick = toMenu;
   $('btnQuit').onclick = toMenu;
@@ -999,21 +1175,18 @@ function toMenu() { G.state = 'menu'; show('over', false); show('pauseMenu', fal
   $('btnMute').onclick = () => { muted = !muted; $('btnMute').textContent = muted ? '🔇' : '🔊'; };
 })();
 
-// 主選單背景的展示畫面
-G.players = [mkPlayer(0, ARCHS[0], false), mkPlayer(1, ARCHS[1], true)];
-Object.assign(G.players[0], { x: -3, y: 24 }); Object.assign(G.players[1], { x: 4, y: 20 });
-ball.owner = G.players[0];
-
+setupDemo();
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(.033, (now - last) / 1000); last = now;
-  if (G.state === 'menu') { G.t += dt; updBall(dt); }
-  else update(dt);
-  render();
+  update(dt);
+  render(dt);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-window.__G = G; window.__ball = ball;
+
+// 測試用掛勾
+window.__T = { G, ball, update, aiUpdate, user, cpu, startGame, inp, setReadMove: f => { readMove = f; } };
 </script>
 </body>
 </html>
